@@ -214,6 +214,7 @@ view Inspector {
   <Inspector.View
     repeat={views}
     key={_.path}
+    class={{pane: true }}
     {..._}
     writeBack={onWriteBack}
     onClose={e => close(_.path, e)}
@@ -223,5 +224,9 @@ view Inspector {
     position: 'fixed',
     top: 0, right: 0,
     padding: 2
+  }
+
+  $pane = {
+    pointerEvents: hudActive ? 'none' : 'auto',
   }
 }
