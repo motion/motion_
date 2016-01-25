@@ -137,24 +137,28 @@ view Inspector {
   onKeyDown('esc', closeLast)
 
   let offAlt
-  onKey('alt', down => {
-    if (!down) {
+
+  const keysCorrect = ({ altKey, metaKey }) => altKey && !metaKey
+
+  function checkInspect(e) {
+    if (keysCorrect(e)) {
+      // wait a little so were not toooo eager
+      offAlt = on.delay(180, () => {
+        if (keysCorrect(e)) { showInspect() }
+      })
+    } else {
       offAlt && offAlt()
       hideInspect()
     }
-    else {
-      // wait a little so were not toooo eager
-      offAlt = on.delay(180, () => {
-        if (keys.alt && !keys.command) {
-          showInspect()
-        }
-      })
-    }
-  })
+  }
+
+  on.keydown(window, checkInspect)
+  on.keyup(window, checkInspect)
 
   function inspect(target) {
     internal().isInspecting = true
     let path = findPath(target)
+    if (path === null) return
     views = removeTemp(views)
     views = pathActive(views, path) ?
       highlightPath(views, path) :
@@ -162,8 +166,10 @@ view Inspector {
   }
 
   function mouseMove({ target }) {
+    const inspector = ReactDOM.findDOMNode(view)
+
     if (lastTarget != target) {
-      if (target.classList.contains('internal'))
+      if (inspector.contains(target))
         return
 
       lastTarget = target
@@ -187,8 +193,11 @@ view Inspector {
     })
   }
 
-  function glue(e) {
-    views = toggleView(removeTemp(views), findPath(e.target))
+  function glue({ target }) {
+    const inspector = ReactDOM.findDOMNode(view)
+    if (inspector.contains(target)) return
+
+    views = toggleView(removeTemp(views), findPath(target))
     return false
   }
 
