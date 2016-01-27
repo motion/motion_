@@ -7,23 +7,25 @@ import opts from '../opts'
 import makeTemplate from './makeTemplate'
 import { log, handleError } from '../lib/fns'
 
-export default async function build() {
-  try {
-    log('Building extras, bundler...')
-    console.log()
-    await bundler.install()
-    await bundler.internals()
+let hasCopiedBasics = false
 
-    log('Building extras, template...')
+export default async function build({ bundle = true } = {}) {
+  try {
+    console.log()
+
+    if (bundle) {
+      await bundler.install()
+      await bundler.internals()
+    }
+
     makeTemplate()
 
     console.log('  Copying assets...'.dim)
-    log('Building app...')
     await *[
+      gulp.bundleApp(),
       copy.assets(),
       copy.flint(),
-      copy.react(),
-      gulp.bundleApp()
+      copy.react()
     ]
 
     console.log(`\n  Built! ⇢`.green.bold + `  cd .flint/build\n`)

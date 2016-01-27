@@ -3,16 +3,15 @@ import 'whatwg-fetch'
 import hashsum from 'hash-sum'
 import ee from 'event-emitter'
 import React from 'react'
-import rafBatch from './lib/reactRaf'
 import ReactDOM from 'react-dom'
+import rafBatch from './lib/reactRaf'
 import { StyleRoot, keyframes } from 'flint-radium'
-import clone from 'clone'
 import regeneratorRuntime from './vendor/regenerator'
 
-import './lib/promiseErrorHandle'
 import './shim/root'
+import './shim/exports'
 import './shim/on'
-import './shim/partial'
+import './lib/promiseErrorHandle'
 import internal from './internal'
 import onError from './shim/flint'
 import createComponent from './createComponent'
@@ -41,13 +40,6 @@ const folderFromFile = (filePath) =>
     and exposing the public Flint functions
 */
 
-// // shim root view
-// opts.namespace.view = {
-//   update: () => {},
-//   el: createElement('_'),
-//   Flint
-// }
-
 const Flint = {
   // set up flint shims
   init() {
@@ -68,18 +60,13 @@ const Flint = {
       rafBatch.inject()
     }
 
-    // GLOBALS
-    root.global = root // for radium
-    root.regeneratorRuntime = regeneratorRuntime
-    root._history = history // for imported modules to use
-    root.Promise = Promise // for modules to use
+    // shims
     root.React = React
     root.ReactDOM = ReactDOM
+    root.global = root // for radium
+    root.regeneratorRuntime = regeneratorRuntime
     root.on = on
-    root.module = {}
-    root.fetch.json = (...args) => fetch(...args).then(res => res.json())
-
-    // for loading apps
+    root.fetch.json = (a, b, c) => fetch(a, b, c).then(res => res.json())
     root.require = requireFactory(root)
   },
 
@@ -94,9 +81,11 @@ const Flint = {
 
     // init require
     root.require.setApp(name)
+
     // init Internal
-    internal.init(ID)
-    let Internal = root._Flint = internal.get(ID)
+    const Internal = internal.init(ID)
+    root._Flint = Internal
+
     // tools bridge
     const Tools = root._DT
 
@@ -245,8 +234,8 @@ const Flint = {
           if (isNewFile || removedViews.length || addedViews.length)
             return Flint.render()
 
-          // if no views update in file, update all of them
-          if (!Internal.changedViews.length) {
+          // if outside of views the FILE changed, refresh all views in file
+          if (!Internal.changedViews.length && Internal.fileChanged[file]) {
             Internal.changedViews = Internal.viewsInFile[file]
           }
 
@@ -260,7 +249,7 @@ const Flint = {
               }
             }).filter(x => !!x)
 
-            setTimeout(() => emitter.emit('render:done'))
+            emitter.emit('render:done')
           })
         }
       },
@@ -322,10 +311,6 @@ const Flint = {
           // this resets tool errors
           window.onViewLoaded()
         }
-      },
-
-      getFile(name) {
-        return Internal.viewsInFile[name] || []
       },
 
       deleteFile(name) {
@@ -393,5 +378,4 @@ const Flint = {
   }
 }
 
-root.exports = root.exports || {}
-root.exports["flint"] = Flint
+root.exports.flint = Flint

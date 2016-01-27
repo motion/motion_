@@ -6,107 +6,98 @@ import cache from '../cache'
 import bridge from '../bridge'
 import { _, path, log, readFile, handleError, vinyl } from '../lib/fns'
 
-const LOG = 'stream'
+// time we wait for browser load before we just force push
+const UPPER_WAIT_LIMIT = 2000
 
-let basePath, flintPath
-let stream = new Readable({ objectMode: true })
-stream._read = function(n) {}
+const isFileType = (_path, ext) => path.extname(_path) == `.${ext}`
+const debug = log.bind(null, { name: 'stream', icon: '🚀' })
 
-let internalTimeout
-let fileLoading = {}
-let scriptWaiting = {}
+let basePath, flintPath, relPath
 
-function isFileType(_path, ext) {
-  return path.extname(_path) == `.${ext}`
+function init() {
+  basePath = opts('appDir')
+  flintPath = opts('flintDir')
+  relPath = p => nodepath.relative(basePath, p)
+  watchForBrowserLoading()
+  bridge.on('live:save',
+    _.throttle(fileSend, 22, { leading: true }) // throttle the stream a bit
+  )
 }
 
-function fileSend({ path, contents }) {
-  log(LOG, '--- STREAM --- fileSend', path)
+// ignore stream when loading file in browser
+function watchForBrowserLoading() {
+  bridge.on('script:load', setBrowserLoading)
 
+  bridge.on('script:done', ({ path }) => {
+    debug('IN', 'browser', 'done'.green, path)
+    browserLoading[path] = false
+    loadWaiting(path)
+  })
+}
+
+function setBrowserLoading({ path }) {
+  debug('IN', 'browser', 'loading'.red, path)
+  browserLoading[path] = true
+}
+
+let stream = new Readable({ objectMode: true })
+stream._read = function(n) {}
+let internalTimeout
+let browserLoading = {}
+let queue = {}
+
+function fileSend({ path, contents }) {
   // check if file actually in flint project
   if (!path || path.indexOf(basePath) !== 0 || path.indexOf(flintPath) === 0 || !isFileType(path, 'js')) {
-    log(LOG, 'file no JS, not in path, or is in .flint dir', basePath, flintPath, path)
+    debug('  file not js || not in path || in .flint', path)
     return
   }
 
   // write to stream
-  const rPath = nodepath.relative(basePath, path)
-  const file = new File(vinyl(basePath, path, new Buffer(contents)))
+  const relative = relPath(path)
+  debug('SIN', relative)
 
-  log(LOG, 'rpath', rPath)
-
-  function pushStream() {
-    log(LOG, 'pushStream()', path, rPath)
-    stream.push(file)
-  }
-
-  let attempts = 0
-
-  // waits for file load before pushing next
-  function checkPushStream(loop = false) {
-    if (!loop) {
-      // ensures it only runs once after loaded
-      if (scriptWaiting[rPath]) return
-      scriptWaiting[rPath] = true
-    }
-
-    log(LOG, 'checkPushStream', 'rPath', rPath, 'fileLoading', fileLoading[rPath])
-    // loop waiting for browser to finish loading
-    if (fileLoading[rPath]) {
-      log(LOG, 'checkPushStream', 'fileLoading = true', rPath)
-
-      if (++attempts > 50) {
-        // ceil attempts to avoid locks
-        log(LOG, 'ATTEMPTS > 50!!')
-        fileLoading[rPath] = false
-        scriptWaiting[rPath] = false
-      }
-      else {
-        // loop
-        setTimeout(() => checkPushStream(true), 20)
-        return
-      }
-    }
-
-    // fileLoading[rPath] = true
-    scriptWaiting[rPath] = false
-    pushStream()
-  }
-
-  // internals debounce
+  // internals debounce // TODO watch for export finish
   if (cache.isInternal(path)) {
-    log(LOG, 'is exported')
+    debug('is exported!')
     clearTimeout(internalTimeout)
-    internalTimeout = setTimeout(pushStream, 1000)
+    internalTimeout = setTimeout(pushStream, 300)
+    return
   }
-  else {
-    checkPushStream()
-  }
-}
 
-// ignore stream when loading file in browser
-function initScriptWait() {
-  // bridge.on('script:load', ({ path }) => {
-  //   log(LOG, 'script:load', path)
-  //   // fileLoading[path] = true
-  // })
-
-  bridge.on('script:done', ({ path }) => {
-    log(LOG, 'script:done', path)
-    fileLoading[path] = false
+  pushStreamRun(relative, () => {
+    debug('SOUT', relative)
+    queue[relative] = false
+    // why? because we may get another stream before browser even starts loading
+    setBrowserLoading({ path: relative })
+    const file = new File(vinyl(basePath, path, new Buffer(contents)))
+    stream.push(file)
   })
 }
 
-function init() {
-  basePath = opts.get('appDir')
-  flintPath = opts.get('flintDir')
+function pushStreamRun(relative, finish) {
+  // waiting for script load
+  if (browserLoading[relative]) {
+    // only queue once
+    if (queue[relative]) return
+    queue[relative] = finish
+    // ensure upper limit on wait
+    setTimeout(() => {
+      if (!queue[relative]) return
+      debug('upper limit! finish'.yellow)
+      browserLoading[relative] = false
+      finish()
+    }, UPPER_WAIT_LIMIT)
+  }
+  else {
+    finish()
+  }
+}
 
-  initScriptWait()
-
-  // throttle the stream a bit
-  let fileSender = _.throttle(fileSend, 22, { leading: true })
-
-  bridge.on('live:save', fileSender)
+// load waiting
+function loadWaiting(path) {
+  const queued = queue[relPath(path)]
+  if (queued) queued()
 }
 
 export default { init, stream }
