@@ -1,6 +1,6 @@
 {
   "name": "flint",
-  "version": "1.4.71",
+  "version": "1.4.80",
   "description": "Run flint apps",
   "main": "dist/main.js",
   "scripts": {},
@@ -38,7 +38,6 @@
     "gulp-if": "2.0.0",
     "gulp-ignore": "2.0.1",
     "gulp-load-plugins": "1.2.0",
-    "gulp-order": "1.1.1",
     "gulp-plumber": "1.0.0",
     "gulp-rename": "1.2.2",
     "gulp-sourcemaps": "1.6.0",
