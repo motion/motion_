@@ -1,12 +1,12 @@
-import 'whatwg-fetch'
+// import 'whatwg-fetch'
 
 import hashsum from 'hash-sum'
 import ee from 'event-emitter'
-import React from 'react'
-import ReactDOM from 'react-dom'
-import rafBatch from './lib/reactRaf'
-import { StyleRoot, keyframes } from 'flint-radium'
-import regeneratorRuntime from './vendor/regenerator'
+// import React from 'react'
+// import ReactDOM from 'react-dom'
+// import rafBatch from './lib/reactRaf'
+// import { StyleRoot, keyframes } from 'flint-radium'
+// import regeneratorRuntime from './vendor/regenerator'
 
 import './shim/root'
 import './shim/exports'
@@ -26,19 +26,17 @@ import arrayDiff from './lib/arrayDiff'
 import createElement from './tag/createElement'
 import ErrorDefinedTwice from './views/ErrorDefinedTwice'
 import NotFound from './views/NotFound'
-import LastWorkingMainFactory from './views/LastWorkingMain'
-import MainErrorView from './views/Main'
+// import LastWorkingMainFactory from './views/LastWorkingMain'
+// import MainErrorView from './views/Main'
 
 const folderFromFile = (filePath) =>
   filePath.indexOf('/') < 0 ? '' : filePath.substring(0, filePath.lastIndexOf('/'))
 
-/*
-  Welcome to Flint!
+  // Welcome to Flint!
 
-    This file deals mostly with setting up Flint,
-    loading views and files, rendering,
-    and exposing the public Flint functions
-*/
+  // This file deals mostly with setting up Flint,
+  // loading views and files, rendering,
+  // and exposing the public Flint functions
 
 const Flint = {
   // set up flint shims
@@ -56,34 +54,43 @@ const Flint = {
       root.$ = null
     }
 
+    /*
     if (process.env.production) {
       rafBatch.inject()
     }
+    */
 
     // shims
-    root.React = React
-    root.ReactDOM = ReactDOM
+    // root.React = React
+    // root.ReactDOM = ReactDOM
     root.global = root // for radium
     root.regeneratorRuntime = regeneratorRuntime
     root.on = on
+    /*
     root.fetch.json = (a, b, c) => fetch(a, b, c).then(res => res.json())
+    */
     root.require = requireFactory(root)
   },
 
   // run an app
   run(name, _opts, afterRenderCb) {
+    const { React, native } = _opts
+    /*
+    const { renderFn } = _opts
     // default opts
     const opts = Object.assign({
       node: '_flintapp'
     }, _opts)
 
-    const ID = ''+Math.random()
 
     // init require
     root.require.setApp(name)
 
     // init Internal
+    */
+    const ID = ''+Math.random()
     const Internal = internal.init(ID)
+    /*
     root._Flint = Internal
 
     // tools bridge
@@ -105,11 +112,12 @@ const Flint = {
     //
     // begin the flintception
     //
+    */
 
     const Flint = {
       start() {
-        router.init(ID, { onChange: Flint.render })
-        Flint.render()
+        // router.init(ID, { onChange: Flint.render })
+        return Flint.render()
       },
 
       // private API
@@ -127,7 +135,7 @@ const Flint = {
         : Internal.viewDecorator[name] = decorator,
 
       // external API
-      keyframes,
+      //keyframes,
       router,
       preloaders: [], // async functions needed before loading app
 
@@ -151,6 +159,7 @@ const Flint = {
           run()
 
         function run() {
+          conole.log('in run')
           Internal.isRendering++
           if (Internal.isRendering > 3) return
 
@@ -161,7 +170,11 @@ const Flint = {
           if (!Main)
             Main = MainErrorView
 
+          if (native) {
+
+          }
           // server render
+
           if (!opts.node) {
             Flint.renderedToString = React.renderToString(<Main />)
             afterRenderCb && afterRenderCb(Flint.renderedToString)
@@ -177,6 +190,7 @@ const Flint = {
               </StyleRoot>,
               document.getElementById(opts.node)
             )
+
           }
 
           Internal.lastWorkingViews.Main = Main
@@ -263,7 +277,7 @@ const Flint = {
       },
 
       view(name, body) {
-        const comp = opts => createComponent(Flint, Internal, name, body, opts)
+        const comp = opts => createComponent(Flint, React, Internal, name, body, opts)
 
         if (process.env.production)
           return setView(name, comp())
@@ -272,6 +286,10 @@ const Flint = {
 
         function setView(name, component) {
           Internal.views[name] = { hash, component, file: Internal.currentHotFile }
+
+          if (native && name == 'Main') {
+            _opts.renderApp(React.createElement(component))
+          }
         }
 
         // set view in cache
@@ -378,4 +396,7 @@ const Flint = {
   }
 }
 
+root.twelve = 15
 root.exports.flint = Flint
+
+root.CreateFlint = Flint

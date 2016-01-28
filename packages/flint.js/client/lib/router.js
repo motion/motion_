@@ -8,7 +8,7 @@ let activeID = 1
 let routes = {}
 let routesList = []
 let params = {}
-let location = window.location.pathname
+let location = root.location && window.location.pathname
 let listeners = []
 
 function runListeners(location) {

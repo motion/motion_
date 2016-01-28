@@ -80,7 +80,7 @@ module.exports = function(opts) {
     },
 
     output: {
-      path: path.join(__dirname, 'dist'),
+      path: opts.outputPath || path.join(__dirname, 'dist'),
       filename: opts.name ? '[name].'+opts.name+'.js' : '[name].js',
       // libraryTarget: target || opts.libraryTarget
     },

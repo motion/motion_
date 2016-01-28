@@ -1,4 +1,4 @@
-import ReactDOM from 'react-dom'
+// import ReactDOM from 'react-dom'
 
 // ok delayed attempt to make sense of this
 // this file needs refactor love
@@ -234,9 +234,11 @@ function ensureQueue(where, ...names) {
   })
 }
 
+/*
 function getRoot(scope) {
   return ReactDOM.findDOMNode(scope)
 }
+*/
 
 function hasEvents(events) {
   return events && Object.keys(events).length

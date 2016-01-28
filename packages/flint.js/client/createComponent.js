@@ -1,16 +1,14 @@
-import ReactDOMServer from 'react-dom/server'
-import ReactDOM from 'react-dom'
-import React from 'react'
+// import ReactDOMServer from 'react-dom/server'
+// import ReactDOM from 'react-dom'
+// import React from 'react'
 import raf from 'raf'
-import Radium from './lib/radium'
-
+// import Radium from './lib/radium'
 import phash from './lib/phash'
 import cloneError from './lib/cloneError'
 import hotCache from './mixins/hotCache'
 import reportError from './lib/reportError'
 import createElement from './tag/createElement'
 import viewOn from './lib/viewOn'
-
 const capitalize = str =>
   str[0].toUpperCase() + str.substring(1)
 
@@ -20,7 +18,7 @@ const pathWithoutProps = path =>
 let views = {}
 let viewErrorDebouncers = {}
 
-export default function createComponent(Flint, Internal, name, view, options = {}) {
+export default function createComponent(Flint, React, Internal, name, view, options = {}) {
   const el = createElement(name)
   let isChanged = options.changed
 
@@ -33,13 +31,19 @@ export default function createComponent(Flint, Internal, name, view, options = {
     return component
   }
 
-  // production
-  if (process.env.production)
-    return wrapComponent(createViewComponent())
+  const native = false
 
-  // development
-  views[name] = createViewComponent()
+  if (native) {
+    views[name] = createNativeComponent()
+    return views[name]
+  } else {
+    // production
+    if (process.env.production)
+      return wrapComponent(createViewComponent())
 
+    // development
+    views[name] = createViewComponent()
+  }
   // once rendered, isChanged is used to prevent
   // unnecessary props hashing, for faster hot reloads
   Flint.on('render:done', () => {
@@ -127,6 +131,24 @@ export default function createComponent(Flint, Internal, name, view, options = {
 
         return React.createElement(View, viewProps)
       }
+    })
+  }
+
+  function createNativeComponent() {
+    const { Text, View } = React
+    return React.createClass({
+      getInitialState() {
+        const self = this
+        self.render = (cb) => {
+          self.render = cb
+        }
+        view.call(this, this, this.on, this.styles)
+        return null
+      },
+      el(first, props, children) {
+        return <Text>{children}</Text>
+      },
+      render() { return <Text>should be overridden</Text> }
     })
   }
 
@@ -635,6 +657,7 @@ export default function createComponent(Flint, Internal, name, view, options = {
       }
     })
 
-    return Radium(component)
+    return component
+    // return Radium(component)
   }
 }

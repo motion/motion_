@@ -1,5 +1,4 @@
-import React from 'react'
-import classnames from 'classnames'
+// import React from 'react'
 import elementStyles from './styles'
 import reportError from '../lib/reportError'
 import tags from './tags'
