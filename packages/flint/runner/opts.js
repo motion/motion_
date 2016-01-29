@@ -88,7 +88,7 @@ function debug() {
 
 
 function opts(name) {
-  return get(key)
+  return get(name)
 }
 
 opts = get
