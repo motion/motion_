@@ -86,12 +86,7 @@ function debug() {
   console.log(util.inspect(OPTS, false, 10))
 }
 
-
-function opts(name) {
-  return get(key)
-}
-
-opts = get
+let opts = get
 opts.set = set
 opts.setAll = setAll
 opts.serialize = serialize
