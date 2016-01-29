@@ -26,6 +26,7 @@ import arrayDiff from './lib/arrayDiff'
 import createElement from './tag/createElement'
 import ErrorDefinedTwice from './views/ErrorDefinedTwice'
 import NotFound from './views/NotFound'
+
 // import LastWorkingMainFactory from './views/LastWorkingMain'
 // import MainErrorView from './views/Main'
 
@@ -54,11 +55,9 @@ const Flint = {
       root.$ = null
     }
 
-    /*
-    if (process.env.production) {
-      rafBatch.inject()
-    }
-    */
+    // if (process.env.production) {
+      // rafBatch.inject()
+    // }
 
     // shims
     // root.React = React
@@ -66,9 +65,7 @@ const Flint = {
     root.global = root // for radium
     root.regeneratorRuntime = regeneratorRuntime
     root.on = on
-    /*
-    root.fetch.json = (a, b, c) => fetch(a, b, c).then(res => res.json())
-    */
+    // root.fetch.json = (a, b, c) => fetch(a, b, c).then(res => res.json())
     root.require = requireFactory(root)
   },
 
@@ -105,14 +102,16 @@ const Flint = {
 
     // setup shims that use Internal
     onError(Internal, Tools)
-    const LastWorkingMain = LastWorkingMainFactory(Internal)
 
-    const emitter = ee({})
 
     //
     // begin the flintception
     //
     */
+
+    const LastWorkingMain = LastWorkingMainFactory(Internal)
+
+    const emitter = ee({})
 
     const Flint = {
       start() {
@@ -171,26 +170,29 @@ const Flint = {
             Main = MainErrorView
 
           if (native) {
-
-          }
-          // server render
-
-          if (!opts.node) {
-            Flint.renderedToString = React.renderToString(<Main />)
-            afterRenderCb && afterRenderCb(Flint.renderedToString)
-          }
-          // browser render
-          else {
-            if (window.__isDevingDevTools)
-              opts.node = '_flintdevtools'
-
-            ReactDOM.render(
+            _opts.renderApp(
               <StyleRoot className="__flintRoot">
                 <Main />
-              </StyleRoot>,
-              document.getElementById(opts.node)
+              </StyleRoot>
             )
+          } else {
+            // server render
+            if (!opts.node) {
+              Flint.renderedToString = React.renderToString(<Main />)
+              afterRenderCb && afterRenderCb(Flint.renderedToString)
+            }
+            // browser render
+            else {
+              if (window.__isDevingDevTools)
+                opts.node = '_flintdevtools'
 
+              ReactDOM.render(
+                <StyleRoot className="__flintRoot">
+                  <Main />
+                </StyleRoot>,
+                document.getElementById(opts.node)
+              )
+            }
           }
 
           Internal.lastWorkingViews.Main = Main
@@ -287,9 +289,11 @@ const Flint = {
         function setView(name, component) {
           Internal.views[name] = { hash, component, file: Internal.currentHotFile }
 
+          /*
           if (native && name == 'Main') {
             _opts.renderApp(React.createElement(component))
           }
+          */
         }
 
         // set view in cache
@@ -385,6 +389,10 @@ const Flint = {
 
     // prevent overwriting
     Object.freeze(Flint)
+
+    if (native) {
+
+    }
 
     // if given an app, run it
     if (name && root.exports[name]) {

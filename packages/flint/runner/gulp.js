@@ -38,8 +38,8 @@ const hasFinished = () => hasBuilt() && opts('hasRunInitialInstall')
 const relative = file => path.relative(opts('appDir'), file.path)
 const time = _ => typeof _ == 'number' ? ` ${_}ms` : ''
 let out = {}
-out.badFile = (file, err) => console.log(` ◆ ${relative(file)}`.red),
-out.goodFile = (file, ms) => console.log(` ✓ ${relative(file)}`.bold
+out.badFile = (file, err) => console.log(`  ✖ ${relative(file)}`.red),
+out.goodFile = (file, ms) => console.log(`  ✓ ${relative(file)}`.bold
     + `${file.startTime ? time((Date.now() - file.startTime) || 1) : ''}`.dim)
 
 // TODO bad practice
@@ -383,17 +383,15 @@ export function buildScripts({ inFiles, outFiles, userStream }) {
 
     // meta
     let meta = cache.getFileMeta(file.path)
-    if (opts('hasRunInitialBuild'))
-      bridge.message('file:meta', { meta })
-
     // outside changed detection
     sendOutsideChanged(meta, file)
   }
 
   // detects if a file has changed not inside views for hot reloads correctness
   function sendOutsideChanged(meta, file) {
-    let changed = false
+    if (!meta) return
 
+    let changed = false
     const viewLocs = Object.keys(meta).map(view => meta[view].location)
 
     if (viewLocs.length) {
@@ -438,6 +436,11 @@ export function buildScripts({ inFiles, outFiles, userStream }) {
   function afterWrite(file) {
     if (isSourceMap(file.path)) return
 
+    setTimeout(() => {
+      const src = fs.readFileSync(file.path).toString()
+      bridge.message('compile:src', { src }, 'error')
+    })
+
     // run stuff after each change on build --watch
     if (afterBuildWatch()) return
 
@@ -455,6 +458,7 @@ export function buildScripts({ inFiles, outFiles, userStream }) {
 
     // ADD
     bridge.message('script:add', file.message)
+
   }
 
   function afterBuildWatch() {

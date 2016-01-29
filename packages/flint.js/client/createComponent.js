@@ -19,7 +19,6 @@ let views = {}
 let viewErrorDebouncers = {}
 
 export default function createComponent(Flint, React, Internal, name, view, options = {}) {
-  const el = createElement(name)
   let isChanged = options.changed
 
   // wrap decorators
@@ -31,19 +30,14 @@ export default function createComponent(Flint, React, Internal, name, view, opti
     return component
   }
 
-  const native = false
+  const native = false //true
 
-  if (native) {
-    views[name] = createNativeComponent()
-    return views[name]
-  } else {
-    // production
-    if (process.env.production)
-      return wrapComponent(createViewComponent())
+  // production
+  if (process.env.production)
+    return wrapComponent(createViewComponent())
 
-    // development
-    views[name] = createViewComponent()
-  }
+  // development
+  views[name] = createViewComponent()
   // once rendered, isChanged is used to prevent
   // unnecessary props hashing, for faster hot reloads
   Flint.on('render:done', () => {
@@ -158,7 +152,9 @@ export default function createComponent(Flint, React, Internal, name, view, opti
       displayName: name,
       name,
       Flint,
-      el,
+      el(...args) {
+        return createElement.apply(this, [React, ...args])
+      },
 
       // set() get() dec()
       mixins: [hotCache({ Internal, options, name })],
@@ -187,6 +183,7 @@ export default function createComponent(Flint, React, Internal, name, view, opti
       // LIFECYCLES
 
       getInitialState() {
+        this.doRenderInlineStyles = true
         const fprops = this.props.__flint
 
         Internal.getInitialStates[fprops ? fprops.path : 'Main'] = () => this.getInitialState()
@@ -270,8 +267,6 @@ export default function createComponent(Flint, React, Internal, name, view, opti
           // send to inspector if inspecting
           fn && fn(nextProps, state)
         }
-
-
         // })
       },
 
@@ -382,7 +377,7 @@ export default function createComponent(Flint, React, Internal, name, view, opti
         // TODO better checks and warnings, ie if they dont pass in element just props
         if (!el) return el
         if (typeof el !== 'object')
-          throw new Error(`You're attempting to clone something that isn't a tag! In view ${this.name}. Attempted to clone: ${el}`)
+          throw new Error(`You're attempting to clone something that isn't a tag. In view ${this.name}. Attempted to clone: ${el}`)
 
         // move the parent styles source to the cloned view
         if (el.props && el.props.__flint) {
@@ -520,12 +515,15 @@ export default function createComponent(Flint, React, Internal, name, view, opti
         let addWrapper = true
         const numRenders = this.renders && this.renders.length
 
+
         if (!numRenders) {
           tags = []
           props = { yield: true }
         }
 
         else if (numRenders == 1) {
+          return this.renders[0].call(this)
+          /*
           tags = this.renders[0].call(this)
 
           const hasMultipleTags = Array.isArray(tags)
@@ -539,6 +537,7 @@ export default function createComponent(Flint, React, Internal, name, view, opti
               tags = [tags]
             }
           }
+          */
         }
 
         else if (numRenders > 1) {

@@ -129,7 +129,7 @@ export default function createPlugin(options) {
         , '')
       }
 
-      return node.value
+      return node && node.value
     }
 
     function frozen(node) {
@@ -260,7 +260,7 @@ export default function createPlugin(options) {
 
 
     // extract statics
-    function getArrayStatics(node) {
+    function getArrayStatics(node, file) {
       let rightEls = []
       let staticProps = []
 
@@ -272,7 +272,7 @@ export default function createPlugin(options) {
           return result()
         }
 
-        const extracted = extractStatics(node.left.name, el)
+        const extracted = extractStatics(node.left.name, el, file)
         if (!extracted) continue
 
         let { statics, dynamics } = extracted
@@ -292,10 +292,10 @@ export default function createPlugin(options) {
     }
 
     // splits styles into static/dynamic pieces
-    function extractAndAssign(node) {
+    function extractAndAssign(node, file) {
       // if array of objects
       if (t.isArrayExpression(node.right)) {
-        return getArrayStatics(node)
+        return getArrayStatics(node, file)
       }
 
       // extract statics, but return just dynamics
@@ -307,7 +307,7 @@ export default function createPlugin(options) {
 
         viewStyleNames[name] = true
 
-        let { statics, dynamics } = extractStatics(name, node.right)
+        let { statics, dynamics } = extractStatics(name, node.right, file)
 
         // sets dynamic keys for use in determining hot reload clear later
         const statKeys = viewStaticStyleKeys
@@ -365,7 +365,7 @@ export default function createPlugin(options) {
     }
 
     // find statics/dynamics in object
-    function extractStatics(name, node) {
+    function extractStatics(name, node, file) {
       let statics = []
       let dynamics = []
 
@@ -689,7 +689,7 @@ export default function createPlugin(options) {
 
               // track meta
               if (meta.views[currentView]) {
-                meta.views[currentView].els[name + key] = el.loc.end
+                meta.views[currentView].els[name] = { location: el.loc, key }
               }
 
               /*
@@ -779,9 +779,9 @@ export default function createPlugin(options) {
             if (node.name.name == 'sync') {
               return [
                 t.JSXAttribute(t.literal('__flintValue'), node.value),
-                t.JSXAttribute(t.literal('__flintOnChange'), t.functionExpression(null, [t.identifier('e')],
+                t.JSXAttribute(t.literal('__flintOnChange'), t.functionExpression(null, [t.identifier('__flintval__')],
                   t.blockStatement([
-                    t.assignmentExpression('_=_', node.value, t.identifier('e.target.value')),
+                    t.assignmentExpression('_=_', node.value, t.identifier('__flintval__')),
                   ])
                 )),
               ]
@@ -895,11 +895,12 @@ export default function createPlugin(options) {
 
             if (!isStyle) return
 
-            if (currentView)
-              meta.views[currentView].styles[node.left.name.substr(1)] = node.loc.start
+            if (currentView) {
+              meta.views[currentView].styles[node.left.name.substr(1)] = { location: node.loc }
+            }
 
             // styles
-            return extractAndAssign(node)
+            return extractAndAssign(node, file)
           },
 
           exit(node, parent, scope, file) {
