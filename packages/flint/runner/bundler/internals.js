@@ -12,9 +12,9 @@ import log from '../lib/log'
 import handleError from '../lib/handleError'
 import { writeFile } from '../lib/fns'
 
-export async function bundleInternals() {
+export async function internals() {
   try {
-    log.internals('bundleInternals')
+    log.internals('internals')
     await finishedInstalling()
     await writeInternalsIn()
     await packInternals()
@@ -44,7 +44,7 @@ export async function checkInternals(file, source) {
   if (opts('hasRunInitialBuild') && isInternal && !runningBundle) {
     clearTimeout(runningBundle)
     runningBundle = setTimeout(async () => {
-      await bundleInternals()
+      await internals()
       runningBundle = null
     }, 100)
   }

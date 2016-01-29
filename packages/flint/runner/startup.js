@@ -55,12 +55,14 @@ async function runGulp(opts) {
 
 export async function build(opts = {}) {
   try {
-    await startup({ ...opts, isBuild: true })
+    await startup({ ...opts, build: true })
     await bundler.remakeInstallDir()
     await builder.clear.buildDir()
+    gulp.assets()
     await runGulp({ once: opts.once })
     await builder.build()
     if (opts.once) return
+    console.log()
     process.exit()
   }
   catch(e) {
@@ -75,6 +77,7 @@ export async function build(opts = {}) {
 export async function run(opts) {
   try {
     await startup(opts)
+    if (opts.watch) gulp.assets()
     await server.run()
     bridge.activate()
     await runGulp()

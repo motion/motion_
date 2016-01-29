@@ -52,6 +52,9 @@ export function banner() {
     'Editor', 'Rebundle'
   ]
 
+  if (opts('build') && opts('watch'))
+    messages.push('Upload')
+
   // console.log('  Shortcuts')
   console.log(promptLayout(messages, { perLine: 3 }))
   console.log()
@@ -62,10 +65,12 @@ export function banner() {
 function start() {
   let OPTS = opts()
 
-  if (!proc.stdin.isTTY || OPTS.isBuild)
+  if (!proc.stdin.isTTY || (OPTS.build && !OPTS.watch))
     return
 
   keypress(proc.stdin)
+
+  let building = false
 
   // listen for the "keypress" event
   proc.stdin.on('keypress', async function (ch, key) {
@@ -106,17 +111,27 @@ function start() {
           console.log(opts('debug') ? 'Set to log verbose'.yellow : 'Set to log quiet'.yellow, "\n")
           break
         case 'u': // upload
-          // await build({ once: true })
-          // console.log(`\n  Publishing to surge...`)
-          // stop()
-          // proc.stdout.isTTY = false
-          // surge.publish({
-          //   postPublish() {
-          //     console.log('🚀🚀🚀🚀')
-          //     resume()
-          //   }
-          // })({})
-          // proc.stdout.isTTY = true
+          if (building) return
+
+          if (opts('run')) {
+            building = true
+            console.log('\n  Building for production...')
+            await build({ once: true })
+            building = false
+          }
+
+          if (opts('build') && opts('watch')) {
+            console.log(`\n  Publishing to surge...`)
+            stop()
+            proc.stdout.isTTY = false
+            surge.publish({
+              postPublish() {
+                console.log('🚀🚀🚀🚀')
+                resume()
+              }
+            })({})
+            proc.stdout.isTTY = true
+          }
           break
         case 'd':
           console.log("---------opts---------")
@@ -142,13 +157,13 @@ function start() {
 
 export function resume() {
   // listen for keys
-  if (proc.stdin.setRawMode) proc.stdin.setRawMode(true)
+  proc.stdin.setRawMode(true)
   proc.stdin.resume()
   stopped = false
 }
 
 export function stop() {
-  if (proc.stdin.setRawMode) proc.stdin.setRawMode(false)
+  proc.stdin.setRawMode(false)
   proc.stdin.pause()
   stopped = true
 }
