@@ -76,7 +76,7 @@ export async function run(opts) {
   try {
     await startup(opts)
     await server.run()
-    bridge.start()
+    bridge.activate()
     await runGulp()
     cache.serialize() // write out cache
     console.log() // space before install
