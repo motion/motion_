@@ -1,5 +1,5 @@
 import state, { resetProgramState } from '../state'
-import { t, options, relativePath } from '../lib/helpers'
+import { t, options } from '../lib/helpers'
 
 export default {
   enter() {
