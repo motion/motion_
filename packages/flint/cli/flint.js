@@ -8,7 +8,8 @@ const commands = [
   'run',
   'new',
   'build',
-  'update'
+  'update',
+  'up'
 ]
 
 let [ node, flint, cmd = 'run', ...flags ] = process.argv
@@ -42,7 +43,7 @@ Program
   .command('run', 'run app, `flint` is a shortcut for this')
   .command('new [name] [template]', 'start a new app')
   .command('build', 'build your app to .flint/build')
-  // .command('up', 'upload app to the web with Surge.sh')
+  .command('up', 'upload app to the web with Surge.sh')
   .command('update', 'update flint')
 
 Program.parse(args)
