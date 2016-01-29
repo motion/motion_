@@ -18,7 +18,7 @@ import writeStyle from './lib/writeStyle'
 import onMeta from './lib/onMeta'
 import { findBabelRuntimeRequires } from './lib/findRequires'
 import SCRIPTS_GLOB from './const/scriptsGlob'
-import { _, fs, path, glob, readdir, p, rm, mkdir, handleError, logError, log } from './lib/fns'
+import { _, fs, path, glob, readdir, p, rm, mkdir, handleError, logError, log, chalk } from './lib/fns'
 
 const LOG = 'gulp'
 const debug = log.bind(null, { name: 'gulp', icon: '👇' })
@@ -39,8 +39,10 @@ const relative = file => path.relative(opts('appDir'), file.path)
 const time = _ => typeof _ == 'number' ? ` ${_}ms` : ''
 let out = {}
 out.badFile = (file, err) => console.log(`  ✖ ${relative(file)}`.red),
-out.goodFile = symbol => (file, ms) => console.log(`  ${symbol} ${relative(file)}`.bold
-    + `${file.startTime ? time((Date.now() - file.startTime) || 1) : ''}`.dim)
+out.goodFile = symbol => file => {
+  const ms = file.startTime ? time((Date.now() - file.startTime) || 1) : ''
+  console.log(`  ${symbol} ${relative(file)}`.bold, chalk.dim(`${ms}`))
+}
 
 // TODO bad practice
 let fileImports = {}

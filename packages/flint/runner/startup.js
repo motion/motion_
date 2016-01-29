@@ -63,7 +63,9 @@ export async function build(opts = {}) {
     await builder.build()
     if (opts.once) return
     console.log()
-    process.exit()
+
+    if (!opts.keepAlive)
+      process.exit()
   }
   catch(e) {
     handleError(e)

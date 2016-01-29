@@ -1,6 +1,6 @@
 import './lib/checkForApp'
-import Program from 'commander'
 import colors from 'colors'
+import Program from 'commander'
 import { build, run } from '../runner'
 import name from './lib/appName'
 import version from './lib/flintVersion'

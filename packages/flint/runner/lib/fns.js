@@ -1,5 +1,6 @@
 import _ from 'lodash'
 import _glob from 'globby'
+import chalk from 'chalk'
 import readdirp from 'readdirp'
 import path from 'path'
 import fs, { copy, remove, mkdirs, readFile, writeFile, stat, ensureFile } from 'fs-extra'
@@ -107,5 +108,6 @@ export default {
   logError,
   glob,
   promisify,
-  vinyl
+  vinyl,
+  chalk
 }
