@@ -4,16 +4,15 @@ import { p, sanitize } from './lib/fns'
 import disk from './disk'
 import util from 'util'
 
-let OPTS
+let OPTS = {}
 
 function set(key, val) {
-  log('opts.set'.bold.yellow, key, val)
+  log.opts('opts.set'.bold.yellow, key, val)
   OPTS[key] = val
   return val
 }
 
 function get(key) {
-  // if (key != 'deps') log('opts'.bold.green, key, OPTS[key])
   return key ? OPTS[key] : OPTS
 }
 
@@ -88,10 +87,9 @@ function debug() {
 
 
 function opts(name) {
-  return get(key)
+  return get(name)
 }
 
-opts = get
 opts.set = set
 opts.setAll = setAll
 opts.serialize = serialize

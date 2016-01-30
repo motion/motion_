@@ -11,7 +11,12 @@ export default {
       options.onImports(file.opts.filename, state.fileImports)
     }
 
-    state.meta.file = file.opts.filename
+    if (options.onExports) {
+      options.onExports(file.opts.filename, state.hasExports)
+    }
+
+    const location = relativePath(file.opts.filename)
+    state.meta.file = location
 
     if (options.onMeta) {
       options.onMeta(state.meta)
