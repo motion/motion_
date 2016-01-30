@@ -39,6 +39,6 @@ export default function handleError(handle) {
       console.log(error.stack)
 
     console.log(error)
-    bridge.broadcast('compile:error', { error })
+    bridge.broadcast('compile:error', { error }, 'error')
   }
 }
