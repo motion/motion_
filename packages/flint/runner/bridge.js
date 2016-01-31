@@ -51,7 +51,6 @@ export default new class Bridge {
       dir: Cache.baseDir()
     }))
     connection.send(this.encodeMessage('flint:opts', getOptions()))
-
     for (const key in this.queue) {
       connection.send(this.queue[key])
     }
