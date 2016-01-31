@@ -408,6 +408,9 @@ export function buildScripts({ inFiles, outFiles, userStream }) {
     event.run('error', State.curFile, error)
     cache.addError(error.fileName || '', error)
     bridge.broadcast('compile:error', { error }, 'error')
+
+    markDone(State.curFile)
+    buildDone(State.curFile)
   }
 
   function setLastFile(file) {
@@ -516,7 +519,7 @@ export function buildScripts({ inFiles, outFiles, userStream }) {
       opts.set('hasRunInitialBuild', true)
       hasRunCurrentBuild = true
       buildingOnce = false
-      debug('buildDone'.green.bold, 'waitingForFirstBuild', waitingForFirstBuild.length)
+      debug('buildDone!!'.green.bold)
       waitingForFirstBuild.forEach(res => res())
     }
   }
