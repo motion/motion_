@@ -54,7 +54,6 @@ export default new class Bridge {
     for (const key in this.queue) {
       connection.send(this.queue[key])
     }
-    this.queue = {}
   }
 
   broadcast(type, message, cacheKey = null) {
