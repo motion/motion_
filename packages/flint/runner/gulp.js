@@ -20,6 +20,7 @@ import chalk from 'chalk'
 import { findBabelRuntimeRequires } from './lib/findRequires'
 import SCRIPTS_GLOB from './const/scriptsGlob'
 import { _, fs, path, glob, readdir, p, rm, mkdir, handleError, logError, log } from './lib/fns'
+import {getBabelConfig, isProduction} from './helpers'
 
 const debug = log.gulp
 
@@ -31,7 +32,6 @@ let buildingOnce = false
 
 const serializeCache = _.throttle(cache.serialize, 200)
 const isSourceMap = file => path.extname(file) === '.map'
-const isProduction = () => opts('build')
 const isBuilding = () => buildingOnce || (opts('build') && !opts('watch'))
 const hasBuilt = () => hasRunCurrentBuild && opts('hasRunInitialBuild')
 const hasFinished = () => hasBuilt() && opts('hasRunInitialInstall')
@@ -53,31 +53,17 @@ const $p = {
     post: () => compiler('post')
   },
 
-  // for parsing single file
-  flintFile: () => babel({
-    breakConfig: true, // avoid reading .babelrc
-    jsxPragma: 'view.el',
-    stage: 1,
-    blacklist: ['es6.tailCall', 'strict'],
-    retainLines: OPTS.pretty ? false : true,
-    comments: true,
-    optional: ['regenerator', 'runtime'],
-    plugins: [flintTransform.file({
-      log,
-      basePath: OPTS.dir,
-      production: isProduction(),
-      selectorPrefix: opts('config').selectorPrefix || '#_flintapp ',
-      writeStyle: writeStyle.write,
-      onMeta,
-      onImports(file, imports) {
-        fileImports[file] = imports
-      },
-      onExports(file, val) {
-        cache.setFileInternal(file, val)
-      }
-    })],
-    extra: { production: isProduction() }
-  })
+  flintFile: () => babel(getBabelConfig({
+    log,
+    writeStyle: writeStyle.write,
+    onMeta,
+    onImports(file, imports) {
+      fileImports[file] = imports
+    },
+    onExports(file, val) {
+      cache.setFileInternal(file, val)
+    }
+  }))
 }
 
 // gulp doesnt send unlink events for files in deleted folders, so we do our own
@@ -422,6 +408,9 @@ export function buildScripts({ inFiles, outFiles, userStream }) {
     event.run('error', State.curFile, error)
     cache.addError(error.fileName || '', error)
     bridge.broadcast('compile:error', { error }, 'error')
+
+    markDone(State.curFile)
+    buildDone(State.curFile)
   }
 
   function setLastFile(file) {
@@ -530,7 +519,7 @@ export function buildScripts({ inFiles, outFiles, userStream }) {
       opts.set('hasRunInitialBuild', true)
       hasRunCurrentBuild = true
       buildingOnce = false
-      debug('buildDone'.green.bold, 'waitingForFirstBuild', waitingForFirstBuild.length)
+      debug('buildDone!!'.green.bold)
       waitingForFirstBuild.forEach(res => res())
     }
   }
