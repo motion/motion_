@@ -55,6 +55,7 @@ module.exports = function(opts) {
     target: opts.target || 'web',
     entry: opts.entry || entry,
     devtool: 'source-map',
+    externals: opts.externals || {},
 
     node: {
       global: false,

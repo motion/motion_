@@ -1,4 +1,4 @@
-// import ReactDOM from 'react-dom'
+import ReactDOM from 'react-dom'
 
 // ok delayed attempt to make sense of this
 // this file needs refactor love

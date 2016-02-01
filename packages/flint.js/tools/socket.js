@@ -42,6 +42,7 @@ function onOpen() {
 
 function onMessage(message) {
   message = JSON.parse(message.data)
+  console.log('got message', message)
   if (localStorage.getItem('__flintLog'))
     console.log('socket', 'onMessage', 'message', message && message._type, message)
 

@@ -1,6 +1,6 @@
 // import ReactDOMServer from 'react-dom/server'
-// import ReactDOM from 'react-dom'
-// import React from 'react'
+import ReactDOM from 'react-dom'
+import React from 'react'
 import raf from 'raf'
 // import Radium from './lib/radium'
 import phash from './lib/phash'
@@ -8,6 +8,7 @@ import cloneError from './lib/cloneError'
 import hotCache from './mixins/hotCache'
 import reportError from './lib/reportError'
 import createElement from './tag/createElement'
+
 import viewOn from './lib/viewOn'
 const capitalize = str =>
   str[0].toUpperCase() + str.substring(1)
@@ -18,7 +19,7 @@ const pathWithoutProps = path =>
 let views = {}
 let viewErrorDebouncers = {}
 
-export default function createComponent(Flint, React, Internal, name, view, options = {}) {
+export default function createComponent(Internal, name, view, options = {}) {
   let isChanged = options.changed
 
   // wrap decorators
@@ -30,7 +31,8 @@ export default function createComponent(Flint, React, Internal, name, view, opti
     return component
   }
 
-  const native = false //true
+  const native = typeof React.Text !== 'undefined'
+  console.log('native is', native)
 
   // production
   if (process.env.production)
@@ -40,9 +42,11 @@ export default function createComponent(Flint, React, Internal, name, view, opti
   views[name] = createViewComponent()
   // once rendered, isChanged is used to prevent
   // unnecessary props hashing, for faster hot reloads
+  /*
   Flint.on('render:done', () => {
     isChanged = false
   })
+  */
 
   return wrapComponent(createProxyComponent())
 
@@ -128,34 +132,14 @@ export default function createComponent(Flint, React, Internal, name, view, opti
     })
   }
 
-  function createNativeComponent() {
-    const { Text, View } = React
-    return React.createClass({
-      getInitialState() {
-        const self = this
-        self.render = (cb) => {
-          self.render = cb
-        }
-        view.call(this, this, this.on, this.styles)
-        return null
-      },
-      el(first, props, children) {
-        return <Text>{children}</Text>
-      },
-      render() { return <Text>should be overridden</Text> }
-    })
-  }
-
   // create view
   function createViewComponent() {
     const component = React.createClass({
       displayName: name,
       name,
+      native,
       Flint,
-      el(...args) {
-        return createElement.apply(this, [React, ...args])
-      },
-
+      el: createElement,
       // set() get() dec()
       mixins: [hotCache({ Internal, options, name })],
 
@@ -183,7 +167,9 @@ export default function createComponent(Flint, React, Internal, name, view, opti
       // LIFECYCLES
 
       getInitialState() {
-        this.doRenderInlineStyles = true
+        if (native) {
+          this.doRenderInlineStyles = true
+        }
         const fprops = this.props.__flint
 
         Internal.getInitialStates[fprops ? fprops.path : 'Main'] = () => this.getInitialState()
@@ -324,8 +310,10 @@ export default function createComponent(Flint, React, Internal, name, view, opti
         if (Internal.isDevTools) return
 
         // set flintID for state inspect
-        const node = ReactDOM.findDOMNode(this)
-        if (node) node.__flintID = this.props.__flint.path
+        if (!native) {
+          const node = ReactDOM.findDOMNode(this)
+          if (node) node.__flintID = this.props.__flint.path
+        }
       },
 
       componentDidUpdate() {
@@ -655,6 +643,8 @@ export default function createComponent(Flint, React, Internal, name, view, opti
         }
       }
     })
+
+    const { Text } = React
 
     return component
     // return Radium(component)

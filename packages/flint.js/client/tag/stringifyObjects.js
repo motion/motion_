@@ -1,4 +1,4 @@
-// import React from 'react'
+import React from 'react'
 import reportError from '../lib/reportError'
 
 // convert object to string for debugging

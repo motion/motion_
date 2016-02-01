@@ -32,6 +32,12 @@ export default function run(browser, opts) {
       compileSuccess()
     },
 
+    'compile:src': msg => {
+      console.log('new msg', msg)
+      eval(msg.src)
+    },
+
+
     'packages:reload': reloadScript('__flintExternals'),
     'internals:reload': reloadScript('__flintInternals', { reloadAll: true }),
 
@@ -51,7 +57,6 @@ export default function run(browser, opts) {
     'flint:opts': opts => {
       window.__flintopts = opts
     },
-
 
     // coming from editor to browser
 
