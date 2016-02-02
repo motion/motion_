@@ -34,7 +34,9 @@ const serializeCache = _.throttle(cache.serialize, 200)
 const isSourceMap = file => path.extname(file) === '.map'
 const isBuilding = () => buildingOnce || (opts('build') && !opts('watch'))
 const hasBuilt = () => hasRunCurrentBuild && opts('hasRunInitialBuild')
-const hasFinished = () => hasBuilt() && opts('hasRunInitialInstall')
+const hasFinished = () => {
+  return hasBuilt() && opts('hasRunInitialInstall')
+}
 const relative = file => path.relative(opts('appDir'), file.path)
 const time = _ => typeof _ == 'number' ? ` ${_}ms` : ''
 let out = {}
@@ -297,6 +299,7 @@ export function buildScripts({ inFiles, outFiles, userStream }) {
       .pipe(pipefn(afterWrite))
       .pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn())
 
+
   function markDone(file) {
     // mark built
     State.loaded += 1
@@ -493,7 +496,6 @@ export function buildScripts({ inFiles, outFiles, userStream }) {
     if (bundler.isInstalling() || file.willInstall) return
 
     // ADD
-    console.log('broadcasting')
     bridge.broadcast('script:add', file.message)
   }
 

@@ -35,7 +35,8 @@ function setAll(opts) {
   OPTS.build = opts.build
 
   OPTS.hasRunInitialBuild = false
-
+  //TODO by Nick - this shouldn't be set to true
+  OPTS.hasRunInitialInstall = true
   OPTS.defaultPort = 4000
 
   // base dirs
