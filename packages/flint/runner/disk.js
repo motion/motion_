@@ -32,36 +32,42 @@ let writers = {
 
 async function createWriters() {
   writers.package = await createWriter(p(opts('flintDir'), 'package.json'), {
-    debug: 'writePackageJSON',
+    debug: 'packageJSON',
     json: true,
     defaultValue: {}
   })
 
   writers.stateWriter = await createWriter(opts('stateFile'), {
-    debug: 'writeState',
+    debug: 'state',
     json: true,
     defaultValue: {}
   })
 
   writers.pathsWriter = await createWriter(opts('deps').externalsPaths, {
-    debug: 'writeExternalsPaths',
+    debug: 'externalsPaths',
     json: true,
     defaultValue: []
   })
 
   writers.externalsWriter = await createWriter(opts('deps').externalsIn, {
-    debug: 'writeExternals'
+    debug: 'externals'
   })
 }
 
 async function ensureConfigFile() {
   try {
     let config = await readJSON(opts('configFile'))
+
+    // set config in opts
     opts.set('config', config)
+
+    // set specific
+    let conf = (opts('build') ? config.build : config.run) || {}
+    opts.set('nomin', conf.minify === 'false')
+
   }
   catch(e) {
-    // write empty config on error
-    await writeJSON(opts('configFile'), {})
+    handleError({ message: 'Error parsing config file: .flint/flint.json', stack: e.stack })
   }
 }
 

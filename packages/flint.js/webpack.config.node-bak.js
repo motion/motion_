@@ -4,7 +4,7 @@ module.exports = makeConf({
   native: true,
   name: 'node',
   entry: { flint: './client/flint' },
-  outputPath: '/Users/nickc/company/platforms',
+  outputPath: '/Users/nickc/tests/ios-kittens/.flint/.internal/out',
   minify: false,
   env: 'dev',
   target: 'node',

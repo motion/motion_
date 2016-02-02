@@ -62,12 +62,6 @@ export default function elementProps({ name, whitelisted, key, index, isView }, 
   }
 
   // sync
-  /*
-  if (props.onClick) {
-    const clicked = props.onClick
-    props.onClick = undefined
-  }
-  */
   if (props.__flintOnChange) {
     let userOnChange = props.onChange
     let type = props.type
@@ -87,10 +81,6 @@ export default function elementProps({ name, whitelisted, key, index, isView }, 
       props.__flintOnChange(e.target[attr])
     }
     */
-    props.onChangeText = function(text) {
-      if (userOnChange) userOnChange.call(this, e)
-      props.__flintOnChange(text)
-    }
 
     if (typeof props.__flintValue != 'undefined') {
       props[attr] = props.__flintValue

@@ -32,12 +32,6 @@ export default function run(browser, opts) {
       compileSuccess()
     },
 
-    'compile:src': msg => {
-      console.log('new msg', msg)
-      eval(msg.src)
-    },
-
-
     'packages:reload': reloadScript('__flintExternals'),
     'internals:reload': reloadScript('__flintInternals', { reloadAll: true }),
 

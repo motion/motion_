@@ -1,5 +1,4 @@
 import bundler from './bundler'
-import hasExports from './lib/hasExports'
 import cache from './cache'
 import opts from './opts'
 import through from 'through2'
@@ -19,25 +18,26 @@ function debounce(key, time, cb) {
   debouncers[key] = setTimeout(cb, time)
 }
 
-var Parser = {
+export var Parser = {
   init(opts) {
     OPTS = opts || {}
   },
 
   async post(filePath, source, next) {
     try {
+      const isInternal = cache.isInternal(filePath)
+
       // scans
-      const isInternal = hasExports(source)
       const scan = () => bundler.scanFile(filePath, source)
-      const scanNow = OPTS.build || !opts('hasRunInitialBuild')
+      const scanNow = OPTS.build || OPTS.watch || !opts('hasRunInitialBuild')
 
       // scan immediate on startup or building
       if (scanNow) scan()
       // debounce scan during run
-      else debounce(filePath, 500, scan)
+      else debounce(filePath, 2000, scan)
 
       // building, done
-      if (OPTS.build) {
+      if (OPTS.build && !OPTS.watch) {
         next(source, { isInternal })
         return
       }

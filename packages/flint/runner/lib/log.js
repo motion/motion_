@@ -16,7 +16,6 @@ const subIcons = {
   ASTERISK: ' ✺ ',
   HAPPY: ' ☺ ',
   SAD: ' ☹ ',
-  RELOAD: ' ↺ ',
   WRITE: ' ✍ ',
   DOWN: ' ↓ ',
   UP: ' ↑ ',
@@ -25,23 +24,33 @@ const subIcons = {
 export default function log(info, subIcon, ...args) {
   if (!debug) return
 
-  const isStr = typeof info == 'string'
-  let name, icon
-  if (isStr) name = info
-  else ({ name, icon } = info)
+  const isInfo = typeof info == 'object' && info.name && info.icon
 
-  const subi = subIcons[subIcon]
-  const subiout = subi ? subi : `     ${subIcon}`
-  const doLog = () => console.log(icon, subiout, ...colorArgs(args))
+  let icon, subiout
+
+  if (isInfo) {
+    const subi = subIcons[subIcon]
+    subiout = subi ? subi : `    ${subIcon}`
+    args = [info.icon, subiout, ...args]
+  }
+  else
+    args = [info, subIcon, ...args]
+
+  const doLog = () => console.log('   ', ...colorArgs(args))
 
   // all
   if (!debug.length) return doLog()
   // filtered
-  if (name && debug.indexOf(name) >= 0) doLog()
+  if (info.name && debug.indexOf(info.name) >= 0) doLog()
 }
 
 log.externals = log.bind(null, { name: 'externals', icon: '🚀' })
 log.internals = log.bind(null, { name: 'internals', icon: '🏠' })
+log.cache = log.bind(null, { name: 'cache', icon: '💰' })
+log.opts = log.bind(null, { name: 'opts', icon: '❍' })
+log.gulp = log.bind(null, { name: 'gulp', icon: '👇' })
+log.writer = log.bind(null, { name: 'writer', icon: '✎' })
+log.file = log.bind(null, { name: 'file', icon: '▻' })
 
 function colorArgs(args) {
   return args.map(arg =>
@@ -52,4 +61,16 @@ function colorArgs(args) {
 
 log.setLogging = function() {
   debug = opts('debug')
+}
+
+let timeName = null
+let startTime = null
+
+log.start = (name) => {
+  timeName = name
+  startTime = Date.now()
+}
+
+log.end = () => {
+  console.log('TIME', timeName, Date.now() - startTime)
 }

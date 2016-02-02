@@ -1,6 +1,8 @@
-import { log, p, copy, writeFile, readFile, readdir, globCopy, handleError } from '../lib/fns'
+import { log, p, copy, writeFile, readFile, readdir, handleError } from '../lib/fns'
 import opts from '../opts'
 import flintjs from 'flint-js'
+
+// todo gulpify alll the things
 
 async function copyWithSourceMap(file, dest) {
   try { await copy(file, dest) }
@@ -21,6 +23,7 @@ export function react() {
   return copyWithSourceMap(read, write)
 }
 
+// was for webpack styles copying
 export async function styles() {
   try {
     let source = ''
@@ -41,12 +44,4 @@ export async function styles() {
   }
 }
 
-export async function assets() {
-  // copy .flint/statics and assets in app dir
-  await* [
-    globCopy(['*', '**/*'], p(opts('buildDir'), '_', 'static'), { cwd: '.flint/static' }),
-    globCopy(['*', '**/*', '!**/*.js' ], opts('buildDir'))
-  ]
-}
-
-export default { flint, react, assets, styles }
+export default { flint, react, styles }

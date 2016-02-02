@@ -19,7 +19,7 @@ const pathWithoutProps = path =>
 let views = {}
 let viewErrorDebouncers = {}
 
-export default function createComponent(Internal, name, view, options = {}) {
+export default function createComponent(Flint, Internal, name, view, options = {}) {
   let isChanged = options.changed
 
   // wrap decorators
@@ -32,7 +32,6 @@ export default function createComponent(Internal, name, view, options = {}) {
   }
 
   const native = typeof React.Text !== 'undefined'
-  console.log('native is', native)
 
   // production
   if (process.env.production)
@@ -180,7 +179,6 @@ export default function createComponent(Internal, name, view, options = {}) {
         this.propDefaults = {}
         this.queuedUpdate = false
         this.firstRender = true
-        this.isUpdating = true
         this.styles = {}
         this.events = { mount: u, unmount: u, change: u, props: u }
         this.path = null
@@ -266,7 +264,6 @@ export default function createComponent(Internal, name, view, options = {}) {
       componentDidMount() {
         this.isRendering = false
         this.mounted = true
-        this.isUpdating = false
 
         this.runEvents('mount')
 
@@ -302,7 +299,6 @@ export default function createComponent(Internal, name, view, options = {}) {
       },
 
       componentWillUpdate() {
-        this.isUpdating = true
         this.runEvents('change')
       },
 
@@ -318,7 +314,6 @@ export default function createComponent(Internal, name, view, options = {}) {
 
       componentDidUpdate() {
         this.isRendering = false
-        this.isUpdating = false
 
         if (this.queuedUpdate) {
           this.queuedUpdate = false
@@ -409,41 +404,33 @@ export default function createComponent(Internal, name, view, options = {}) {
         this.update()
       },
 
-      // soft = view.set()
-      update({ soft, immediate } = {}) {
+      updateSoft() {
+        this.update(true)
+      },
+
+      // view.set()
+      update(soft) {
         // view.set respects paused
-        if (soft && this.isPaused)
-          return
+        if (soft && this.isPaused) return
 
-        let doUpdate = () => {
-          // if during a render, wait
-          if (this.isRendering || this.isUpdating || !this.mounted || Internal.firstRender) {
-            this.queuedUpdate = true
-          }
-          else {
-            // tools run into weird bug where if error in app on initial render, react gets
-            // mad that you are trying to re-render tools during app render TODO: strip in prod
-            // check for isRendering so it shows if fails to render
-            if (!process.env.production && _Flint.firstRender && _Flint.isRendering)
-              return setTimeout(this.update)
+        // during render, dont update
+        if (this.isRendering) return
 
-            this.isUpdating = true
-            this.queuedUpdate = false
-
-            // rather than setState because we want to skip shouldUpdate calls
-            this.forceUpdate()
-          }
-        }
-
-        if (immediate) {
-          doUpdate()
+        // if during a render, wait
+        if (!this.mounted || Internal.firstRender) {
+          this.queuedUpdate = true
         }
         else {
-          // setTimeout fixes issues with forceUpdate during previous transition in React
-          // batch changes at end of setTimeout
-          if (this.queuedUpdate) return
-          this.queuedUpdate = true
-          setTimeout(doUpdate)
+          // tools run into weird bug where if error in app on initial render, react gets
+          // mad that you are trying to re-render tools during app render TODO: strip in prod
+          // check for isRendering so it shows if fails to render
+          if (!process.env.production && _Flint.firstRender && _Flint.isRendering)
+            return setTimeout(this.update)
+
+          this.queuedUpdate = false
+
+          // rather than setState because we want to skip shouldUpdate calls
+          this.forceUpdate()
         }
       },
 

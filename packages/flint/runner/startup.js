@@ -8,8 +8,10 @@ import disk from './disk'
 import gulp from './gulp'
 import cache from './cache'
 import keys from './keys'
+import native from './native/index'
 import watchDeletes from './lib/watchDeletes'
 import { logError, handleError, path, log } from './lib/fns'
+import Autocomplete from './autocomplete'
 
 // welcome to flint!
 
@@ -21,6 +23,7 @@ export async function startup(_opts = {}) {
 
   console.log()
 
+
   // opts
   const appDir = _opts.appDir || path.normalize(process.cwd());
   const OPTS = await opts.setAll({ ..._opts, appDir })
@@ -29,6 +32,7 @@ export async function startup(_opts = {}) {
   log.setLogging()
   log('opts', OPTS)
 
+  native.init()
   // init, order important
   await disk.init() // reads versions and sets up readers/writers
   await builder.clear.init() // ensures internal directories set up
@@ -44,7 +48,7 @@ export async function startup(_opts = {}) {
 
 let gulpStarted = false
 
-async function runGulp(opts) {
+async function gulpScripts(opts) {
   await gulp.init(opts)
   await gulp.afterBuild()
 }
@@ -55,17 +59,37 @@ async function runGulp(opts) {
 
 export async function build(opts = {}) {
   try {
-    await startup({ ...opts, isBuild: true })
-    await bundler.remakeInstallDir()
-    await builder.clear.buildDir()
-    await runGulp({ once: opts.once })
+    await startup({ ...opts, build: true })
+    await * [
+      bundler.remakeInstallDir(),
+      builder.clear.buildDir()
+    ]
+    await * [
+      gulp.assets(),
+      gulpScripts({ once: opts.once })
+    ]
     await builder.build()
     if (opts.once) return
+    console.log()
     process.exit()
   }
   catch(e) {
     handleError(e)
   }
+}
+
+function runAutocomplete(bridge) {
+  const autocomplete = new Autocomplete()
+  bridge.onMessage('editor:autocomplete', function(message) {
+    const id = message.id
+    try  {
+      const suggestions = autocomplete.provideAutocomplete(message.text, message.position)
+      bridge.broadcast('editor:autocomplete', {id, suggestions})
+    } catch (_) {
+      logError(_)
+      bridge.broadcast('editor:autocomplete', {id, suggestions: []})
+    }
+  })
 }
 
 //
@@ -75,11 +99,12 @@ export async function build(opts = {}) {
 export async function run(opts) {
   try {
     await startup(opts)
+    if (opts.watch) gulp.assets()
     await server.run()
-    bridge.start()
-    await runGulp()
+    runAutocomplete(bridge)
+    bridge.activate()
+    await gulpScripts()
     cache.serialize() // write out cache
-    console.log() // space before install
     await bundler.all()
     if (opts.watch) await builder.build()
     keys.init()

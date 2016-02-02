@@ -234,11 +234,9 @@ function ensureQueue(where, ...names) {
   })
 }
 
-/*
 function getRoot(scope) {
   return ReactDOM.findDOMNode(scope)
 }
-*/
 
 function hasEvents(events) {
   return events && Object.keys(events).length

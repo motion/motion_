@@ -8,6 +8,7 @@ require("shelljs/global")
 //
 
 const VERBOSE = process.argv.indexOf('--verbose') > 0
+const PATCH = process.argv.indexOf('--patch') > 0
 
 // safe exec
 function ex(cmd) {
@@ -67,7 +68,7 @@ var appPath = n => path.join('apps', n, '.flint')
 var lastArg = process.argv[process.argv.length - 1]
 
 // release one
-if (lastArg.indexOf('--') == -1) {
+if (!lastArg.indexOf('release') && lastArg.indexOf('--') == -1) {
   console.log("Just releasing", lastArg)
 
   // release one
@@ -132,8 +133,7 @@ function release(name, dir) {
       ex('node prepublish.js')
     }
 
-    // TODO only patch if given option
-    ex('npm version patch')
+    if (PATCH) ex('npm version patch')
     console.log(ex('npm publish --tag=latest'))
   })
 }

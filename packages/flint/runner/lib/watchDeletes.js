@@ -2,7 +2,7 @@ import path from 'path'
 import opts from '../opts'
 import cache from '../cache'
 import bridge from '../bridge'
-import { bundleInternals } from '../bundler/internals'
+import { internals } from '../bundler/internals'
 import { p, rm, log, handleError } from './fns'
 
 async function deleteJS(view) {
@@ -22,21 +22,21 @@ export default function watchDeletes() {
     cache.onDeleteView(async view => {
       log('onDeleteView', view)
       await deleteStyle(view)
-      bridge.message('stylesheet:remove', { view })
+      bridge.broadcast('stylesheet:remove', { view })
     })
 
     cache.onDeleteFile(async ({ name, file, state }) => {
       log('onDeleteFile', name, file, state)
 
       if (state.isInternal)
-        await bundleInternals()
+        await internals()
 
       await state.views.forEach(async view => {
         await deleteStyle(view)
         await deleteJS(view)
       })
 
-      bridge.message('file:delete', { name })
+      bridge.broadcast('file:delete', { name })
     })
   }
 

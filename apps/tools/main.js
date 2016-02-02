@@ -8,7 +8,7 @@ view Main {
   <Errors />
   <Installer />
   <Menu if={showInspector} />
-  <Inspector if={showInspector} />
+  // <Inspector if={showInspector} />
   <StateTests if={internal} />
 
   $ = {

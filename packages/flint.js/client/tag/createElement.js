@@ -17,7 +17,6 @@ import { isString, every } from 'lodash'
 
 */
 
-const DIV = 'div'
 
 function getNativeEl(tag, els) {
   console.log('getting native el', tag, els)
@@ -43,6 +42,17 @@ function getNativeEl(tag, els) {
   return nameToComponent(nativeEl)
 }
 
+/*
+
+  Shim around React.createElement, that adds in our:
+
+     - tag helpers (sync, yield, repeat, if, ...)
+     - styling (radium, css classes, ...)
+     - object to string
+
+*/
+
+const DIV = 'div'
 
 export default function createElement(identifier : Identifier, _props, ...args) {
   // TODO remove or document
@@ -50,12 +60,8 @@ export default function createElement(identifier : Identifier, _props, ...args) 
     return React.createElement(identifier[1], _props, ...args)
 
   const view = this
-  // todo do this better
-  let native = false
-  if (React.Text) native = true
-  //const { native } = view
-  const Flint = this.Flint
-
+  const Flint = view.Flint
+  const native = typeof React.Text !== 'undefined'
 
   const el: Element = getElement(identifier, view, _props, Flint.getView)
   const props = elementProps(el, view, Flint, _props)
@@ -67,8 +73,6 @@ export default function createElement(identifier : Identifier, _props, ...args) 
 
   const tag = props.tagName || (el.whitelisted ? DIV : el.component || el.name)
   const platformEl = native ? getNativeEl(tag, args) : tag
-
-  console.log('creating element', tag, 'is native', native)
 
   return React.createElement(platformEl, props, ...args)
 }

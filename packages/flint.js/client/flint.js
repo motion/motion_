@@ -1,5 +1,6 @@
-// import 'whatwg-fetch'
-console.log('prod', process.env.production)
+import 'whatwg-fetch'
+import 'reapp-object-assign'
+
 import hashsum from 'hash-sum'
 import ee from 'event-emitter'
 import React from 'react'
@@ -175,19 +176,19 @@ const Flint = {
           */
           // browser render
           //else {
-            if (window.__isDevingDevTools)
-              opts.node = '_flintdevtools'
+          if (window.__isDevingDevTools)
+            opts.node = '_flintdevtools'
 
-            if (native) {
-              _opts.renderApp(<Main />)
-            } else {
-              ReactDOM.render(
-                <StyleRoot className="__flintRoot">
-                  <Main />
-                </StyleRoot>,
-                document.getElementById(opts.node)
-              )
-            }
+          if (native) {
+            _opts.renderApp(<Main />)
+          } else {
+            ReactDOM.render(
+              <StyleRoot className="__flintRoot">
+                <Main />
+              </StyleRoot>,
+              document.getElementById(opts.node)
+            )
+          }
           //}
 
           // Internal.lastWorkingViews.Main = Main
@@ -274,7 +275,7 @@ const Flint = {
       },
 
       view(name, body) {
-        const comp = opts => createComponent(Internal, name, body, opts)
+        const comp = opts => createComponent(Flint, Internal, name, body, opts)
 
         if (!native && process.env.production)
           return setView(name, comp())
@@ -312,7 +313,7 @@ const Flint = {
 
           // if unchanged
           if (Internal.views[name].hash == hash) {
-            setView(name, comp({ hash }))
+            setView(name, comp({ hash, unchanged: true }))
             return
           }
 

@@ -17,6 +17,8 @@ let basePath, flintPath, relPath
 let internalTimeout
 let browserLoading = {}
 let queue = {}
+let stream = new Readable({ objectMode: true })
+stream._read = function(n) {}
 
 function init() {
   basePath = opts('appDir')
@@ -25,7 +27,7 @@ function init() {
   watchForBrowserLoading()
 
   // watch, throttle the stream a bit
-  bridge.on('live:save', _.throttle(fileSend, 22, { leading: true }))
+  bridge.onMessage('live:save', _.throttle(fileSend, 22, { leading: true }))
 
   // reset loading on errors in pipeline
   gulp.event('error', ({ path }) => setBrowserLoading(relPath(path), false))
@@ -33,8 +35,8 @@ function init() {
 
 // ignore stream when loading file in browser
 function watchForBrowserLoading() {
-  bridge.on('script:load', ({ path }) => setBrowserLoading(path, true))
-  bridge.on('script:done', ({ path }) => setBrowserLoading(path, false))
+  bridge.onMessage('script:load', ({ path }) => setBrowserLoading(path, true))
+  bridge.onMessage('script:done', ({ path }) => setBrowserLoading(path, false))
 }
 
 function setBrowserLoading(path, isLoading) {
@@ -43,15 +45,12 @@ function setBrowserLoading(path, isLoading) {
   if (!isLoading) loadWaiting(path)
 }
 
-let stream = new Readable({ objectMode: true })
-stream._read = function(n) {}
-
 function fileSend({ path, contents }) {
   const file = new File(vinyl(basePath, path, new Buffer(contents)))
   stream.push(file)
   return
   // check if file actually in flint project
-  if (!path || path.indexOf(basePath) !== 0 || path.indexOf(flintPath) === 0 || !isFileType(path, 'js')) {
+  if (!path || path.indexOf(basePath) !== 0 || relPath(path).indexOf('.flint') === 0 || !isFileType(path, 'js')) {
     debug('  file not js || not in path || in .flint', path)
     return
   }

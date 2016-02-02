@@ -16,12 +16,13 @@ import babel from './lib/gulp-babel'
 import opts from './opts'
 import writeStyle from './lib/writeStyle'
 import onMeta from './lib/onMeta'
+import chalk from 'chalk'
 import { findBabelRuntimeRequires } from './lib/findRequires'
 import SCRIPTS_GLOB from './const/scriptsGlob'
-import { _, fs, path, glob, readdir, p, rm, handleError, logError, log } from './lib/fns'
+import { _, fs, path, glob, readdir, p, rm, mkdir, handleError, logError, log } from './lib/fns'
+import {getBabelConfig, isProduction} from './helpers'
 
-const LOG = 'gulp'
-const debug = log.bind(null, { name: 'gulp', icon: '👇' })
+const debug = log.gulp
 
 const $ = loadPlugins()
 
@@ -31,16 +32,18 @@ let buildingOnce = false
 
 const serializeCache = _.throttle(cache.serialize, 200)
 const isSourceMap = file => path.extname(file) === '.map'
-const isProduction = () => isBuilding() || opts('buildWatch')
-const isBuilding = () => buildingOnce || opts('build')
+const isBuilding = () => buildingOnce || (opts('build') && !opts('watch'))
 const hasBuilt = () => hasRunCurrentBuild && opts('hasRunInitialBuild')
 const hasFinished = () => hasBuilt() && opts('hasRunInitialInstall')
 const relative = file => path.relative(opts('appDir'), file.path)
 const time = _ => typeof _ == 'number' ? ` ${_}ms` : ''
 let out = {}
 out.badFile = (file, err) => console.log(`  ✖ ${relative(file)}`.red),
-out.goodFile = (file, ms) => console.log(`  ✓ ${relative(file)}`.bold
-    + `${file.startTime ? time((Date.now() - file.startTime) || 1) : ''}`.dim)
+out.goodFile = symbol => (file, ms) => console.log(
+    `  ${chalk.dim(symbol)} ${chalk.bold(relative(file))} `
+    + chalk.dim(file.startTime ? time((Date.now() - file.startTime) || 1).dim : '')
+)
+out.goodScript = out.goodFile('-')
 
 // TODO bad practice
 let fileImports = {}
@@ -51,28 +54,17 @@ const $p = {
     post: () => compiler('post')
   },
 
-  // for parsing single file
-  flintFile: () => babel({
-    breakConfig: true, // avoid reading .babelrc
-    jsxPragma: 'view.el',
-    stage: 1,
-    blacklist: ['es6.tailCall', 'strict'],
-    retainLines: OPTS.pretty ? false : true,
-    comments: true,
-    optional: ['regenerator', 'runtime'],
-    plugins: [flintTransform.file({
-      log,
-      basePath: OPTS.dir,
-      production: isProduction(),
-      selectorPrefix: opts('config').selectorPrefix || '#_flintapp ',
-      writeStyle: writeStyle.write,
-      onMeta,
-      onImports(file, imports) {
-        fileImports[file] = imports
-      }
-    })],
-    extra: { production: isProduction() }
-  })
+  flintFile: () => babel(getBabelConfig({
+    log,
+    writeStyle: writeStyle.write,
+    onMeta,
+    onImports(file, imports) {
+      fileImports[file] = imports
+    },
+    onExports(file, val) {
+      cache.setFileInternal(file, val)
+    }
+  }))
 }
 
 // gulp doesnt send unlink events for files in deleted folders, so we do our own
@@ -130,6 +122,74 @@ export async function init({ once = false } = {}) {
   }
 }
 
+// ||
+// ||  ASSETS
+// ||
+
+export async function assets() {
+  try {
+    await* [
+      assetsApp(),
+      assetsStatics()
+    ]
+  }
+  catch(e) {
+    handleError(e)
+  }
+}
+
+// app images, fonts, etc
+function assetsApp() {
+  const assets = {
+    glob: ['*', '**/*', '!**/*.js', , '!**/*.js.map', '!.flint{,/**}' ],
+    out: opts('buildDir')
+  }
+
+  let stream = gulp.src(assets.glob)
+
+  if (opts('watch'))
+    stream = stream.pipe($.watch(assets.glob, { readDelay: 1 }))
+
+  return new Promise((resolve, reject) => {
+    stream
+        .pipe($.plumber())
+        // .pipe(pipefn(out.goodFile('⇢')))
+        .pipe(gulp.dest(assets.out))
+        .on('end', resolve)
+        .on('error', reject)
+  })
+}
+
+// .flint/static
+async function assetsStatics() {
+  const statics = {
+    dir: p(opts('flintDir'), 'static'),
+    glob: ['*', '**/*', '!.flint{,/**}'],
+    out: p(opts('buildDir'), '_', 'static')
+  }
+
+  await mkdir(statics.out)
+
+  let stream = gulp.src(statics.glob, { cwd: statics.dir })
+
+  if (opts('watch'))
+    stream = stream.pipe($.watch(statics.glob, { readDelay: 1 }))
+
+  return new Promise((resolve, reject) => {
+    stream
+        .pipe($.plumber())
+        // .pipe(pipefn(out.goodFile('⇢')))
+        .pipe(gulp.dest(statics.out))
+        .on('end', resolve)
+        .on('error', reject)
+  })
+}
+
+
+// ||
+// ||  BUILD
+// ||
+
 // used for build
 export async function bundleApp() {
   try {
@@ -141,7 +201,7 @@ export async function bundleApp() {
     appFiles = appFiles.map(f => f.fullPath).filter(x => !isSourceMap(x)).sort()
 
     if (minify)
-      console.log(`  Minifying...`.dim)
+      console.log(`\n  Minifying...`.dim)
 
     // build parallel
     await* [
@@ -154,8 +214,6 @@ export async function bundleApp() {
     handleError(e)
   }
 }
-
-const concat = (src, dest, name) => new Promise(res => gulp.src(src).pipe($.concat(name)).pipe(gulp.dest(dest)).on('end', res))
 
 function buildForDeploy(src, { dest, combine, minify, wrap }) {
   return new Promise((resolve, reject) => {
@@ -189,69 +247,68 @@ export function event(name, cb) {
   listeners[name].push(cb)
 }
 
-// userStream is optional for programmatic usage
+
+
+// ||
+// ||  RUN / BUILD WATCH
+// ||
+
 export function buildScripts({ inFiles, outFiles, userStream }) {
-  let curFile, lastError
-  let lastSavedTimestamp = {}
+  let State = {
+    curFile: null,
+    lastError: null,
+    lastSaved: {},
+    loaded: 0,
+    total: inFiles && inFiles.length || 0
+  }
 
-  // track inFiles files to determine when it's loaded
-  let loaded = 0
-  let total = inFiles && inFiles.length || 0
-
-  // gulp src stream
-  const gulpSrcStream = gulp.src(SCRIPTS_GLOB)
+  let scripts = userStream || gulp.src(SCRIPTS_GLOB)
     .pipe($.if(!isBuilding(), $.watch(SCRIPTS_GLOB, { readDelay: 1 })))
-    // ignore unlinks in pipeline
     .pipe($.if(file => file.event == 'unlink', $.ignore.exclude(true)))
 
-  // either user or gulp stream
-  const dirStream = dirAddStream(opts('appDir'))
-  const sourceStream = userStream || gulpSrcStream
-  const stream = isBuilding() ? sourceStream : merge(sourceStream, dirStream, superStream.stream)
-
-  return stream
-    .pipe($.if(buildCheck, $.ignore.exclude(true)))
-    .pipe(pipefn(resetLastFile))
-    .pipe($.plumber(catchError))
-    .pipe(pipefn(setLastFile))
-    .pipe($p.flint.pre())
-    .pipe($.sourcemaps.init())
-    .pipe($p.flintFile())
-    .pipe(pipefn(updateCache)) // right after babel
-    .pipe($p.flint.post())
-    .pipe($.if(!userStream, $.rename({ extname: '.js' })))
-    // is internal
-    .pipe($.if(file => file.isInternal,
-      multipipe(
-        pipefn(out.goodFile),
-        pipefn(removeNewlyInternal),
-        pipefn(markFileSuccess), // before writing to preserve path
-        gulp.dest(p(OPTS.depsDir, 'internal')),
-        pipefn(afterBuildWatch),
-        $.ignore.exclude(true)
-      )
-    ))
-    // not sourcemap
-    .pipe($.if(file => !isSourceMap(file.path),
-      multipipe(
-        pipefn(out.goodFile),
-        pipefn(markFileSuccess)
-      )
-    ))
-    .pipe($.sourcemaps.write('.'))
-    .pipe($.if(checkWriteable, gulp.dest(OPTS.outDir)))
-    .pipe(pipefn(afterWrite))
-    .pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn())
+  return (isBuilding() ?
+    scripts :
+    merge(scripts, dirAddStream(opts('appDir')), superStream.stream)
+  )
+      .pipe($.if(buildCheck, $.ignore.exclude(true)))
+      .pipe(pipefn(resetLastFile))
+      .pipe($.plumber(catchError))
+      .pipe(pipefn(setLastFile))
+      .pipe($p.flint.pre())
+      .pipe($.sourcemaps.init())
+      .pipe($p.flintFile())
+      .pipe(pipefn(updateCache)) // right after babel
+      .pipe($p.flint.post())
+      .pipe($.if(!userStream, $.rename({ extname: '.js' })))
+      // is internal
+      .pipe($.if(file => file.isInternal,
+        multipipe(
+          pipefn(removeNewlyInternal),
+          pipefn(markFileSuccess), // before writing to preserve path
+          gulp.dest(p(OPTS.depsDir, 'internal')),
+          pipefn(bundle),
+          pipefn(buildDone),
+          $.ignore.exclude(true)
+        )
+      ))
+      .pipe(pipefn(markFileSuccess))
+      .pipe($.sourcemaps.write('.'))
+      .pipe($.if(checkWriteable, gulp.dest(OPTS.outDir)))
+      .pipe(pipefn(afterWrite))
+      .pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn()).pipe(pipefn())
 
   function markDone(file) {
     // mark built
-    loaded += 1
-    debug('markDone', loaded, total, file.path)
+    State.loaded += 1
 
-    // check if done
-    if (loaded == total) {
-      // add some delay to allow building last file TODO improve
-      setTimeout(buildDone, 100)
+    const done = State.loaded == State.total
+
+    debug('markDone', State.total, '/', State.loaded, done)
+
+    // check if done, only run once
+    if (done && !opts('hasRunInitialBuild')) {
+      opts.set('finishingFirstBuild', true)
+      file.finishingFirstBuild = true
     }
   }
 
@@ -262,49 +319,30 @@ export function buildScripts({ inFiles, outFiles, userStream }) {
       return true
 
     // already done with first build
-    if (hasBuilt())
-      return false
+    if (hasBuilt()) return false
 
     // hide behind cached flag for now
     if (!opts('cached')) {
-      finish()
-      return false
-    }
-
-    debug('buildCheck', file.path)
-
-    function finish() {
-      debug('buildCheck finish')
-      cache.restorePrevious(file.path)
-
       markDone(file)
-    }
-
-    if (isBuilding()) {
-      finish()
       return false
     }
 
-    const outFile = path.join(OPTS.outDir, path.relative(OPTS.appDir, file.path))
     const prevFile = cache.getPrevious(file.path)
-
-    // if exported file, mark done and skip
-    if (prevFile && prevFile.isInternal) {
-      finish()
-      return false
-    }
+    if (!prevFile) return false
 
     let outMTime, srcMTime
 
-    try {
-      srcMTime = fs.statSync(file.path).mtime
-    }
-    catch(e) {
-      debug('buildCheck', 'src file removed')
-      return false
-    }
+    // read srcfile
+    try { srcMTime = fs.statSync(file.path).mtime }
+    catch(e) { return false }
 
+    // read outfile
     try {
+      const relPath = path.relative(OPTS.appDir, file.path)
+      const outFile = prevFile.isInternal
+        ? path.join(OPTS.deps.dir, 'internal', relPath)
+        : path.join(OPTS.outDir, relPath)
+
       outMTime = fs.statSync(outFile).mtime
     }
     catch(e) {
@@ -313,45 +351,48 @@ export function buildScripts({ inFiles, outFiles, userStream }) {
       return false
     }
 
+    // final check
     const goodBuild = +outMTime > +srcMTime
+    const goodCache = prevFile.added > srcMTime
+    if (!goodBuild || !goodCache) return false
+    return finish(true)
 
-    if (!goodBuild)
-      return false
+    function finish(restored = false) {
+      markDone(file)
 
-    const cached = cache.getPrevious(file.path)
+      if (restored) {
+        cache.restorePrevious(file.path)
+        out.goodScript(file)
+        afterWrite(file)
+      }
 
-    if (!cached)
-      return false
-
-    const goodCache = cached.added > srcMTime
-
-    if (!goodCache)
-      return false
-
-    finish()
-    return true
+      return restored
+    }
   }
 
   function resetLastFile(file) {
     fileImports[file] = false
-    lastError = false
-    curFile = file
+    State.lastError = false
+    State.curFile = file
     file.startTime = Date.now()
     file.message = { startTime: file.startTime }
   }
 
   function catchError(error) {
     debug('catchError', error)
-    lastError = true
-    out.badFile(curFile)
+    State.lastError = true
+    out.badFile(State.curFile)
 
     error.timestamp = Date.now()
 
-    logError(error, curFile)
+    logError(error, State.curFile)
 
-    event.run('error', curFile, error)
+    event.run('error', State.curFile, error)
     cache.addError(error.fileName || '', error)
-    bridge.message('compile:error', { error }, 'error')
+    bridge.broadcast('compile:error', { error }, 'error')
+
+    markDone(State.curFile)
+    buildDone(State.curFile)
   }
 
   function setLastFile(file) {
@@ -368,7 +409,7 @@ export function buildScripts({ inFiles, outFiles, userStream }) {
       compiledAt: file.startTime
     }
 
-    curFile = file
+    State.curFile = file
   }
 
   // update cache: meta/src/imports
@@ -398,7 +439,7 @@ export function buildScripts({ inFiles, outFiles, userStream }) {
       // slice out all code not in views
       const outerSlice = (ls, start, end) => ls.slice(0, start).concat(ls.slice(end))
 
-      const outsideSrc = viewLocs.reduce((src, loc) => outerSlice(src, loc.start.line - 1, loc.end.line), file.src.split("\n")).join('')
+      const outsideSrc = viewLocs.reduce((src, loc) => outerSlice(src, loc[0][0], loc[1][0] + 1), file.src.split("\n")).join('')
       const cacheFile = cache.getFile(file.path)
       const prevOutsideSrc = cacheFile.outsideSrc
       cacheFile.outsideSrc = outsideSrc // update
@@ -406,27 +447,23 @@ export function buildScripts({ inFiles, outFiles, userStream }) {
     }
 
     if (opts('hasRunInitialBuild'))
-      bridge.message('file:outsideChange', { name: cache.relative(file.path), changed })
+      bridge.broadcast('file:outsideChange', { name: cache.relative(file.path), changed })
   }
 
   function checkWriteable(file) {
-    if (isBuilding()) {
-      builder.copy.styles()
-    }
-
-    if (userStream || lastError)
+    if (userStream || State.lastError)
       return false
 
     if (isBuilding())
       return true
 
     const isNew = (
-      !lastSavedTimestamp[file.path] ||
-      file.startTime > lastSavedTimestamp[file.path]
+      !State.lastSaved[file.path] ||
+      file.startTime > State.lastSaved[file.path]
     )
 
     if (isNew) {
-      lastSavedTimestamp[file.path] = file.startTime
+      State.lastSaved[file.path] = file.startTime
       return true
     }
 
@@ -436,33 +473,42 @@ export function buildScripts({ inFiles, outFiles, userStream }) {
   function afterWrite(file) {
     if (isSourceMap(file.path)) return
 
-    setTimeout(() => {
-      const src = fs.readFileSync(file.path).toString()
-      bridge.message('compile:src', { src }, 'error')
-    })
-
-    // run stuff after each change on build --watch
-    if (afterBuildWatch()) return
+    buildDone(file)
 
     // avoid during initial build
     if (!hasFinished()) return
+
+    if (file.isInternal) return
+
+    // run stuff after each change on build --watch
+    bundle()
 
     // avoid ?? todo: figure out why this is necessary
     if (!cache.get(file.path)) return
 
     // avoid if error
-    if (lastError) return
+    if (State.lastError) return
 
     // avoid if installing
     if (bundler.isInstalling() || file.willInstall) return
 
     // ADD
-    bridge.message('script:add', file.message)
-
+    console.log('broadcasting')
+    bridge.broadcast('script:add', file.message)
   }
 
-  function afterBuildWatch() {
-    if (opts('buildWatch') && hasBuilt()) {
+  function buildDone(file) {
+    if (file.finishingFirstBuild) {
+      opts.set('hasRunInitialBuild', true)
+      hasRunCurrentBuild = true
+      buildingOnce = false
+      debug('buildDone'.green.bold)
+      waitingForFirstBuild.forEach(res => res())
+    }
+  }
+
+  function bundle() {
+    if (opts('watch') && hasBuilt()) {
       builder.build({ bundle: false })
       return true
     }
@@ -471,22 +517,32 @@ export function buildScripts({ inFiles, outFiles, userStream }) {
   function markFileSuccess(file) {
     if (isSourceMap(file.path)) return
 
-    debug('DOWN', 'success'.green, 'internal?', file.isInternal, 'install?', file.willInstall, file.path)
+    out.goodScript(file)
+
+    debug('DOWN', 'success'.green, 'internal?', file.isInternal, 'install?', file.willInstall)
+
+    if (file.isInternal) return
 
     // update cache error / state
     cache.update(file.path)
 
     // write cache state to disk
-    serializeCache()
+    if (opts('hasRunInitialBuild'))
+      serializeCache()
+
+    /* used for native websockets
+    const src = fs.readFileSync(file.path)
+    bridge.broadcast('compile:src', { src })
+    */
 
     // message browser of compile success
-    bridge.message('compile:success', file.message, 'error')
+    bridge.broadcast('compile:success', file.message, 'error')
 
     // check if other errors left still in queue
     const error = cache.getLastError()
     if (!error) return
     debug('cache last error', error)
-    bridge.message('compile:error', { error }, 'error')
+    bridge.broadcast('compile:error', { error }, 'error')
   }
 
   // ok so we start a file
@@ -498,7 +554,7 @@ export function buildScripts({ inFiles, outFiles, userStream }) {
     const filePath = path.relative(p(opts('deps').dir, 'internal'), file.path)
     // then resolve path to .flint/.internal/out/xyz.js
     const outPath = p(opts('outDir'), filePath)
-    debug('remove newly internal', outPath)
+    // debug('remove newly internal', outPath)
     rm(outPath)
   }
 }
@@ -524,14 +580,6 @@ function afterBuild() {
   })
 }
 
-function buildDone() {
-  opts.set('hasRunInitialBuild', true)
-  hasRunCurrentBuild = true
-  buildingOnce = false
-  waitingForFirstBuild.forEach(res => res())
-}
-
-
 function pipefn(fn) {
   return through.obj(function(file, enc, next) {
     let result = fn && fn(file)
@@ -546,4 +594,4 @@ function pipefn(fn) {
   })
 }
 
-export default { init, buildScripts, bundleApp, afterBuild, event }
+export default { init, buildScripts, bundleApp, afterBuild, event, assets }

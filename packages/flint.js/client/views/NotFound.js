@@ -1,3 +1,5 @@
+import React from 'react'
+
 const NotFound = (name) => (
   () => (
     <div style={{ display: 'block' }}>

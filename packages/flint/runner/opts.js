@@ -4,16 +4,15 @@ import { p, sanitize } from './lib/fns'
 import disk from './disk'
 import util from 'util'
 
-let OPTS
+let OPTS = {}
 
 function set(key, val) {
-  log('opts.set'.bold.yellow, key, val)
+  log.opts('opts.set'.bold.yellow, key, val)
   OPTS[key] = val
   return val
 }
 
 function get(key) {
-  // if (key != 'deps') log('opts'.bold.green, key, OPTS[key])
   return key ? OPTS[key] : OPTS
 }
 
@@ -33,10 +32,9 @@ function setAll(opts) {
   OPTS.reset = opts.reset
   OPTS.cached = opts.cached
   OPTS.nomin = opts.nomin
+  OPTS.build = opts.build
 
   OPTS.hasRunInitialBuild = false
-  OPTS.build = opts.isBuild
-  OPTS.buildWatch = opts.buildWatch
 
   OPTS.defaultPort = 4000
 
@@ -62,8 +60,8 @@ function setAll(opts) {
 
   OPTS.configFile = p(OPTS.flintDir, 'flint.json')
   OPTS.stateFile = p(OPTS.internalDir, 'state.json')
-  OPTS.outDir = p(OPTS.internalDir, '../../../built')
-  // OPTS.outDir = p(OPTS.internalDir, 'out')
+  // OPTS.outDir = p(OPTS.internalDir, '../../../built')
+  OPTS.outDir = p(OPTS.internalDir, 'out')
   OPTS.styleDir = p(OPTS.internalDir, 'styles')
   OPTS.styleOutDir = p(OPTS.buildDir, '_', 'styles.css')
 
@@ -90,10 +88,9 @@ function debug() {
 
 
 function opts(name) {
-  return get(key)
+  return get(name)
 }
 
-opts = get
 opts.set = set
 opts.setAll = setAll
 opts.serialize = serialize
