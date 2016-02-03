@@ -11,11 +11,12 @@ let OPTS = {}
 export async function init(cli) {
   // init
   OPTS.appDir = path.normalize(process.cwd())
-  OPTS.name = opts.name || path.basename(process.cwd())
-  OPTS.saneName = sanitize(opts.name)
+  OPTS.name = cli.name || path.basename(process.cwd())
+  OPTS.saneName = sanitize(cli.name)
   OPTS.hasRunInitialBuild = false
   OPTS.defaultPort = 4000
 
+  setupCliOpts(cli)
   setupDirs()
 
   OPTS.hasRunInitialBuild = false
@@ -48,6 +49,14 @@ function readConfig() {
   })
 }
 
+function setupCliOpts(cli) {
+  OPTS.version = cli.version
+  OPTS.debug = cli.debug
+  OPTS.watch = cli.watch
+  OPTS.reset = cli.reset
+  OPTS.build = cli.build
+}
+
 async function loadConfigs() {
   // await readConfig()
   return await flintConfig()
@@ -56,7 +65,8 @@ async function loadConfigs() {
 async function flintConfig() {
   try {
     const config = await readJSON(OPTS.configFile)
-    return config[OPTS.build ? 'build' : 'run']
+    const modeSpecificConfig = config[OPTS.build ? 'build' : 'run']
+    return Object.assign(config, modeSpecificConfig)
   }
   catch(e) {
     handleError({ message: `Error parsing config file: ${OPTS.configFile}` })
@@ -91,12 +101,6 @@ function setupDirs() {
 }
 
 function setupConfig(cli, config) {
-  OPTS.version = cli.version
-  OPTS.debug = cli.debug
-  OPTS.watch = cli.watch
-  OPTS.reset = cli.reset
-  OPTS.build = cli.build
-
   // config
   OPTS.config = Object.assign(
     {
