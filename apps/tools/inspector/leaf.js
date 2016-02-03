@@ -12,11 +12,7 @@ const isPrimitive = v => getType(v) !== 'Object' && getType(v) !== 'Array'
 const getLeafKey = (key, value) => isPrimitive(value) ?
   (key + ':' + md5(String(key))) :
   (key + '[' + getType(value) + ']')
-const fnParams = fn => fn.toString()
-  .replace(/((\/\/.*$)|(\/\*[\s\S]*?\*\/)|(\s))/mg,'')
-  .match(/^function\s*[^\(]*\(\s*([^\)]*)\)/m)[1]
-  .split(/,/)
-
+  
 const fnParams = fn => fn.toString()
   .replace(/((\/\/.*$)|(\/\*[\s\S]*?\*\/)|(\s))/mg,'')
   .match(/^function\s*[^\(]*\(\s*([^\)]*)\)/m)[1]

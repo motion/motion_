@@ -124,11 +124,11 @@ const Flint = {
       iff,
       noop: function(){},
 
-      // alpha
+      // beta
       _onViewInstance: (name, decorator) => !decorator
         ? Internal.instanceDecorator.all = name
         : Internal.instanceDecorator[name] = decorator,
-      _decorateView: (name, decorator) => !decorator
+      decorateView: (name, decorator) => !decorator
         ? Internal.viewDecorator.all = name
         : Internal.viewDecorator[name] = decorator,
 

@@ -1,11 +1,12 @@
 import { Readable } from 'stream'
 import File from 'vinyl'
 import nodepath from 'path'
-import opts from '../opts'
-import cache from '../cache'
-import bridge from '../bridge'
-import gulp from '../gulp'
-import { _, path, log, readFile, handleError, vinyl } from '../lib/fns'
+import { gulp } from './helpers'
+import { event } from '../index'
+import opts from '../../opts'
+import cache from '../../cache'
+import bridge from '../../bridge'
+import { _, path, log, readFile, handleError, vinyl } from '../../lib/fns'
 
 // time we wait for browser load before we just force push
 const UPPER_WAIT_LIMIT = 2000
@@ -30,7 +31,7 @@ function init() {
   bridge.onMessage('live:save', _.throttle(fileSend, 22, { leading: true }))
 
   // reset loading on errors in pipeline
-  gulp.event('error', ({ path }) => setBrowserLoading(relPath(path), false))
+  event('error', ({ path }) => setBrowserLoading(relPath(path), false))
 }
 
 // ignore stream when loading file in browser
