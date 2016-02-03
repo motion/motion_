@@ -136,7 +136,7 @@ async function getExternalStyles() {
 
 async function makeTemplate(req) {
   try {
-    const templatePath = p(OPTS.dir, OPTS.template)
+    const templatePath = p(OPTS.appDir, OPTS.template)
     const template = await readFile(templatePath)
     const disableTools = devToolsDisabled(req)
     const scripts = await getScripts({ disableTools })
@@ -189,8 +189,13 @@ function run() {
 
     server.get('*', function(req, res) {
       afterFirstBuild(async function() {
-        const template = await makeTemplate(req)
-        res.send(template.replace(/\/static/g, '/_/static'))
+        try {
+          const template = await makeTemplate(req)
+          res.send(template.replace(/\/static/g, '/_/static'))
+        }
+        catch(e) {
+          console.log(e, e.stack)
+        }
       })
     })
 
@@ -205,13 +210,13 @@ function run() {
       process.send(JSON.stringify({ host, port }))
     }
 
-    var host = 'localhost'
-    let port = OPTS.port || OPTS.defaultPort
+    const host = OPTS.config.host || 'localhost'
+    const port = OPTS.config.port || OPTS.defaultPort
 
     // if no specified port, find open one
-    if (!OPTS.port) {
+    if (!OPTS.config.port) {
       portfinder.basePort = port
-      portfinder.getPort({ host: 'localhost' },
+      portfinder.getPort({ host },
         handleError(serverListen)
       )
     }

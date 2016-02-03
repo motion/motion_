@@ -1,5 +1,4 @@
 import bridge from './bridge'
-import compiler from './compiler'
 import server from './server'
 import bundler from './bundler'
 import builder from './builder'
@@ -10,57 +9,55 @@ import cache from './cache'
 import keys from './keys'
 import watchDeletes from './lib/watchDeletes'
 import { logError, handleError, path, log } from './lib/fns'
+import Editor from './editor'
 
 // welcome to flint!
 
 let started = false
 
-export async function startup(_opts = {}) {
+export async function startup(options = {}) {
+  if (process.env.startedat) {
+    console.log('total startup time: ', Date.now() - process.env.startedat)
+  }
+
   if (started) return
   started = true
 
   console.log()
 
-  // opts
-  const appDir = _opts.appDir || path.normalize(process.cwd());
-  const OPTS = await opts.setAll({ ..._opts, appDir })
-
-  // log
+  // order important!
+  await opts.init(options)
   log.setLogging()
-  log('opts', OPTS)
-
-  // init, order important
   await disk.init() // reads versions and sets up readers/writers
   await builder.clear.init() // ensures internal directories set up
-  await opts.serialize() // write out opts to state file
-  await* [
+  await * [
+    opts.serialize(), // write out opts to state file
     cache.init(),
     bundler.init()
   ]
 
-  compiler('init', OPTS)
   watchDeletes()
 }
 
-let gulpStarted = false
-
-async function runGulp(opts) {
+async function gulpScripts(opts) {
   await gulp.init(opts)
   await gulp.afterBuild()
 }
 
-//
-// flint build
-//
-
 export async function build(opts = {}) {
   try {
-    await startup({ ...opts, isBuild: true })
-    await bundler.remakeInstallDir()
-    await builder.clear.buildDir()
-    await runGulp({ once: opts.once })
+    await startup({ ...opts, build: true })
+    await * [
+      bundler.remakeInstallDir(),
+      builder.clear.buildDir()
+    ]
+    await * [
+      gulp.assets(),
+      gulpScripts({ once: opts.once })
+    ]
     await builder.build()
     if (opts.once) return
+    console.log()
     process.exit()
   }
   catch(e) {
@@ -68,18 +65,15 @@ export async function build(opts = {}) {
   }
 }
 
-//
-// flint run
-//
-
 export async function run(opts) {
   try {
     await startup(opts)
+    if (opts.watch) gulp.assets()
     await server.run()
-    bridge.start()
-    await runGulp()
+    activateEditor(bridge)
+    bridge.activate()
+    await gulpScripts()
     cache.serialize() // write out cache
-    console.log() // space before install
     await bundler.all()
     if (opts.watch) await builder.build()
     keys.init()
@@ -87,4 +81,9 @@ export async function run(opts) {
   catch(e) {
     handleError(e)
   }
+}
+
+function activateEditor(bridge) {
+  const editor = new Editor()
+  editor.activate(bridge)
 }

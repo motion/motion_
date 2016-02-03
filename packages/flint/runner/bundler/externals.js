@@ -1,17 +1,15 @@
-import { webpack } from '../lib/require'
+import { webpack } from '../lib/requires'
 import webpackConfig from './lib/webpackConfig'
-import handleWebpackErrors from './lib/handleWebpackErrors'
+import getWebpackErrors from './lib/getWebpackErrors'
 import disk from '../disk'
 import opts from '../opts'
 import cache from '../cache'
 import requireString from './lib/requireString'
 import { installAll } from './install'
 import { onInstalled } from './lib/messages'
-import { log, path, writeJSON, writeFile } from '../lib/fns'
+import { log, logError } from '../lib/fns'
 
-const LOG = 'externals'
-
-export async function bundleExternals(opts = {}) {
+export async function externals(opts = {}) {
   if (opts.doInstall) await installAll()
   await externalsPathsToIn()
   await packExternals()
@@ -20,7 +18,7 @@ export async function bundleExternals(opts = {}) {
 
 export async function installExternals(filePath, source) {
   const found = cache.getExternals(filePath)
-  log(LOG, 'installExternals', filePath, 'found', found)
+  log.externals('installExternals', found)
   if (opts('hasRunInitialBuild')) installAll(found)
 }
 
@@ -31,15 +29,16 @@ async function externalsPathsToIn() {
 }
 
 async function packExternals() {
-  log(LOG, 'pack externals')
+  log.externals('pack externals')
 
   return new Promise((resolve, reject) => {
     const conf = webpackConfig('externals.js', {
       entry: opts('deps').externalsIn,
     })
 
-    webpack()(conf, (err, stats) => {
-      handleWebpackErrors('externals', err, stats, resolve, reject)
+    webpack()(conf, async (err, stats) => {
+      logError(getWebpackErrors('externals', err, stats))
+      resolve()
     })
   })
 }

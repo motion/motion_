@@ -1,43 +1,30 @@
-import bundler from './bundler'
-import hasExports from './lib/hasExports'
-import cache from './cache'
-import opts from './opts'
-import through from 'through2'
-import handleError from './lib/handleError'
-
-let views = []
-let OPTS
+import bundler from '../bundler'
+import cache from '../cache'
+import opts from '../opts'
+import { through } from './lib/helpers'
+import { handleError } from '../lib/fns'
 
 const isNotIn = (x,y) => x.indexOf(y) == -1
 const viewMatcher = /^view\s+([\.A-Za-z_0-9]*)\s*\{/
 
-let debouncers = {}
-function debounce(key, time, cb) {
-  if (debouncers[key])
-    clearTimeout(debouncers[key])
+let views = []
 
-  debouncers[key] = setTimeout(cb, time)
-}
-
-var Parser = {
-  init(opts) {
-    OPTS = opts || {}
-  },
-
+export const Scanner = {
   async post(filePath, source, next) {
     try {
-      // scans
-      const isInternal = hasExports(source)
+      const isInternal = cache.isInternal(filePath)
       const scan = () => bundler.scanFile(filePath, source)
-      const scanNow = OPTS.build || !opts('hasRunInitialBuild')
+      const scanNow = opts('build') || opts('watch') || !opts('hasRunInitialBuild')
 
-      // scan immediate on startup or building
+      // scan now on startup or build
       if (scanNow) scan()
-      // debounce scan during run
-      else debounce(filePath, 500, scan)
+      // debounce during run
+      else {
+        debounce(filePath, 2000, scan)
+      }
 
       // building, done
-      if (OPTS.build) {
+      if (opts('build') && !opts('watch')) {
         next(source, { isInternal })
         return
       }
@@ -87,17 +74,17 @@ var Parser = {
       })
       .join("\n")
 
-    cache.add(filePath)
-    cache.setViews(filePath, viewNames)
+    // TODO move this into babel
+    if (filePath) {
+      cache.add(filePath)
+      cache.setViews(filePath, viewNames)
+    }
 
     next(source)
   }
 }
 
-function compile(type, opts = {}) {
-  if (type == 'init')
-    return Parser.init(opts)
-
+function compile(type) {
   return through.obj(function(file, enc, next) {
     if (file.isNull()) {
       next(null, file)
@@ -105,7 +92,7 @@ function compile(type, opts = {}) {
     }
 
     try {
-      let res = Parser[type](file.path, file.contents.toString(), (source, fileProps = {}) => {
+      let res = Scanner[type](file.path, file.contents.toString(), (source, fileProps = {}) => {
         file.contents = new Buffer(source || '')
         // add fileprops coming from compilers
         Object.assign(file, fileProps)
@@ -119,5 +106,15 @@ function compile(type, opts = {}) {
     }
   })
 }
+
+
+let debouncers = {}
+function debounce(key, time, cb) {
+  if (debouncers[key])
+    clearTimeout(debouncers[key])
+
+  debouncers[key] = setTimeout(cb, time)
+}
+
 
 export default compile

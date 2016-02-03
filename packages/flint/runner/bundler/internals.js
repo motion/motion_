@@ -1,22 +1,18 @@
-import { webpack } from '../lib/require'
+import { finishedInstalling } from './install'
+import { webpack } from '../lib/requires'
 import { onInternalInstalled } from './lib/messages'
 import webpackConfig from './lib/webpackConfig'
-import { readInstalled } from './lib/readInstalled'
-import handleWebpackErrors from './lib/handleWebpackErrors'
+import getWebpackErrors from './lib/getWebpackErrors'
 import requireString from './lib/requireString'
-import hasExports from '../lib/hasExports'
 import bridge from '../bridge'
 import cache from '../cache'
 import opts from '../opts'
-import log from '../lib/log'
-import handleError from '../lib/handleError'
-import { writeFile } from '../lib/fns'
+import { log, logError, handleError, writeFile } from '../lib/fns'
 
-const LOG = 'internals'
-
-export async function bundleInternals() {
+export async function internals() {
   try {
-    log(LOG, 'bundleInternals')
+    log.internals('internals')
+    await finishedInstalling()
     await writeInternalsIn()
     await packInternals()
     onInternalInstalled()
@@ -26,23 +22,22 @@ export async function bundleInternals() {
   }
 }
 
+// TODO move to writer
 async function writeInternalsIn() {
   const files = cache.getExported()
-  await writeFile(opts('deps').internalsIn, requireString(files, './internal/'))
+  await writeFile(opts('deps').internalsIn, requireString(files, {
+    prefix: './internal/',
+    removeExt: true
+  }))
 }
 
 let runningBundle = null
 
-// TODO: check this in babel to be more accurate
 export async function checkInternals(file, source) {
-  const isInternal = hasExports(source)
-  cache.setIsInternal(file, isInternal)
-
-  // not on build
-  if (opts('hasRunInitialBuild') && isInternal && !runningBundle) {
+  if (opts('hasRunInitialBuild') && cache.isInternal(file) && !runningBundle) {
     clearTimeout(runningBundle)
     runningBundle = setTimeout(async () => {
-      await bundleInternals()
+      await internals()
       runningBundle = null
     }, 100)
   }
@@ -60,7 +55,7 @@ export function webpackUserExternals() {
 }
 
 function packInternals() {
-  log(LOG, 'packInternals')
+  log.internals('packInternals')
 
   return new Promise((resolve, reject) => {
     const conf = webpackConfig('internals.js', {
@@ -69,7 +64,8 @@ function packInternals() {
     })
 
     webpack()(conf, (err, stats) => {
-      handleWebpackErrors('internals', err, stats, resolve, reject)
+      logError(getWebpackErrors('internals', err, stats))
+      resolve()
     })
   })
 }

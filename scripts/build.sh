@@ -33,35 +33,27 @@ for p in "${packages[@]}"; do
 done
 
 if [ "$1" = "--watch" ]; then
-  # relink cli
-  echo "Watch CLI for relink"
-  chsum1=""
-  cd packages/flint
+  # watch tools after first build
+  if [ "$2" != '--notools' ]; then
+    sleep 4
+    cd apps/tools
+    flint build --watch --nomin &
+    cd ../..
+  fi
 
-  sleep 1
-  hasLinkedOnce='false'
-  while [[ true ]]
-  do
-    if [ -d 'lib' ]; then
-      chsum2=`find lib -type f -exec md5 {} \;`
-      if [[ $chsum1 != $chsum2 ]] ; then
-        npm link --loglevel=error
-        chsum1=$chsum2
-        hasLinkedOnce='true'
-
-        # watch tools after first build
-        if [ $hasLinkedOnce=='false' ] && [ "$2" != '--notools' ]; then
-          sleep 1
-          cd ../..
-          cd apps/tools
-          flint build --watch --nomin &
-          cd ../..
-          cd packages/cli
-        fi
-      fi
-    fi
-    sleep 1
-  done
+  # relink cli automatically
+  # chsum1=""
+  # cd packages/flint
+  # while [[ true ]]; do
+  #   if [ -d 'dist' ]; then
+  #     chsum2=`find dist -type f -exec md5 {} \;`
+  #     if [[ $chsum1 != $chsum2 ]] ; then
+  #       npm link --loglevel=error
+  #       chsum1=$chsum2
+  #     fi
+  #   fi
+  #   sleep 1
+  # done
 fi
 
 # wait for bg tasks

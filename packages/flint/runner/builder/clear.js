@@ -1,4 +1,4 @@
-import { p, log, handleError, recreateDir, mkdir } from '../lib/fns'
+import { p, log, handleError, rm, recreateDir, mkdir } from '../lib/fns'
 import opts from '../opts'
 import disk from '../disk'
 
@@ -10,13 +10,17 @@ export async function init() {
   if (opts('reset') || isDiffVersion)
     await recreateDir(opts('internalDir'))
 
-  // TODO may want to recreate all of depsDir?
-  // recreate assets on re-run
-  await recreateDir(opts('deps').assetsDir)
+  await * [
+    recreateDir(opts('deps').assetsDir),
+    mkdir(opts('internalDir')),
+    mkdir(opts('styleDir')),
+    rm(p(opts('internalDir'), 'user-config'))
+  ]
 
-  await mkdir(opts('internalDir'))
-  await mkdir(opts('styleDir'))
-  await mkdir(opts('outDir'))
+  if (opts('cached'))
+    await mkdir(opts('outDir'))
+  else
+    await recreateDir(opts('outDir'))
 }
 
 export async function internalDir() {

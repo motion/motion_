@@ -1,137 +1,101 @@
-import path from 'path'
-import ws from 'nodejs-websocket'
-import log from './lib/log'
-import wport from './lib/wport'
-import intCache from './cache'
-import opts from './opts'
+'use babel'
 
-const LOG = 'bridge'
+import {Emitter, CompositeDisposable} from 'sb-event-kit'
+import {createServer} from 'ws'
+import websocketPort from './lib/wport'
+import Cache from './cache'
+import getOptions from './opts'
+import Log from './lib/log'
 
-let wsServer
-let connected = false
-let connections = []
-let queue = []
+const debug = Log.bind(null, { name: 'bridge', icon: '🚃' })
 
-// cache to send on reconnects
-// type : str => key : str => messages : arr
-let messageCache = {}
+export default new class Bridge {
+  constructor() {
+    this.subscriptions = new CompositeDisposable()
+    this.emitter = new Emitter()
+    this.connections = new Set()
+    this.server = null
+    this.queue = {}
 
-function broadcast(data) {
-  connections.forEach(conn => {
-    conn.sendText(data)
-  })
-}
-
-function runQueue() {
-  if (queue.length && wsServer) {
-    queue.forEach(broadcast)
-    queue = []
+    this.subscriptions.add(this.emitter)
   }
-}
 
-function sendInitialMessages(conn) {
-  conn.sendText(makeMessage('flint:baseDir', { dir: intCache.baseDir() }))
-  conn.sendText(makeMessage('flint:opts', opts()))
-
-  // send cached stuff on connect
-  Object.keys(messageCache).forEach(cat => {
-    Object.keys(messageCache[cat]).forEach(key => {
-      let { type, obj } = messageCache[cat][key]
-      message(obj.type || type, obj)
+  activate() {
+    this.server = createServer({
+      port: websocketPort()
+    }, connection => {
+      this.connections.add(connection)
+      connection.on('close', () => {
+        this.connections.delete(connection)
+      })
+      connection.on('message', (data, flags) => {
+        if (flags.binary) {
+          // Ignore binary
+          debug('Ignoring message because its binary')
+          return
+        }
+        try {
+          const message = JSON.parse(data)
+          debug('IN', message._type)
+          this.emitter.emit(`message:${message._type}`, message)
+        } catch (_) {
+          debug('Error parsing bridge message')
+        }
+      })
+      this.welcomeConnection(connection)
     })
-  })
-}
-
-function cleanError(obj) {
-  if (obj.error.fileName)
-    obj.error.file = path.relative(intCache.baseDir(), obj.error.fileName)
-
-  return obj
-}
-
-function makeMessage(type, obj) {
-  obj = obj || {}
-  obj._type = type
-  obj.timestamp = Date.now()
-
-  // formatting
-  switch(type) {
-    case 'compile:error':
-      obj = cleanError(obj)
-      break
   }
 
-  let msg = JSON.stringify(obj)
+  welcomeConnection(connection) {
+    connection.send(this.encodeMessage('flint:baseDir', {
+      dir: Cache.baseDir()
+    }))
+    connection.send(this.encodeMessage('flint:opts', getOptions()))
 
-  return msg
-}
-
-export function cache(name, key, obj) {
-  log(LOG, 'cache', key, name, obj)
-  messageCache[name] = messageCache[name] || {}
-  messageCache[name][key] = messageCache[name][key] || []
-  messageCache[name][key] = obj
-}
-
-export function message(type, obj, cacheKey) {
-  log(LOG, type)
-
-  if (cacheKey)
-    cache(cacheKey, 'last', { type, obj })
-
-  let msg = makeMessage(type, obj)
-
-  if (connected)
-    broadcast(msg)
-  else
-    queue.push(msg)
-}
-
-let listeners = {}
-export function on(event, cb) {
-  listeners[event] = listeners[event] || []
-  listeners[event].push(cb)
-}
-
-// passes messages from/to browser/editor
-on('editor', msg => message('editor', msg))
-on('editor:state', msg => message('editor:state', msg, 'editor:state'))
-on('browser', msg => message('browser', msg))
-
-function runListeners(data) {
-  log(LOG, '-[in]-', data)
-
-  let obj
-
-  try {
-    obj = JSON.parse(data)
-  }
-  catch(e) {
-    console.error(e.stack)
-    return
+    for (const key in this.queue) {
+      connection.send(this.queue[key])
+    }
   }
 
-  const { ...args, _type } = obj
-  const ls = listeners[_type]
-  if (!ls || !ls.length) return
-  ls.forEach(l => l(args))
+  broadcast(type, message, cacheKey = null) {
+    this.broadcastRaw(this.encodeMessage(type, message), cacheKey)
+  }
+
+  encodeMessage(type, message = {}) {
+    debug('OUT', type)
+    return JSON.stringify(Object.assign({
+      _type: type,
+      timestamp: Date.now()
+    }, message))
+  }
+
+  broadcastRaw(message, cacheKey = null) {
+    if (typeof message !== 'string') {
+      throw new Error('Malformed message given')
+    }
+
+    // If we have any active connections
+    if (this.connections.size) {
+      this.connections.forEach(function(connection) {
+        connection.send(message)
+      })
+    }
+
+    if (cacheKey !== null) {
+      this.queue[cacheKey] = message
+    }
+  }
+
+  onMessage(type, callback) {
+    return this.emitter.on(`message:${type}`, callback)
+  }
+
+  dispose() {
+    if (this.server) {
+      this.server.close()
+    }
+    this.connections.clear()
+    this.subscriptions.dispose()
+    this.queue = null
+  }
 }
-
-export function start() {
-  const port = wport()
-
-  wsServer = ws.createServer(conn => {
-    connections.push(conn)
-
-    conn.on('text', runListeners)
-    conn.on('error', err => {})
-
-    sendInitialMessages(conn)
-
-    if (connected) return
-    connected = true
-    runQueue()
-  }).listen(port)
-}
-
-export default { start, message, on, cache }

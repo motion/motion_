@@ -3,7 +3,7 @@ import server from './server'
 import shutdown from './shutdown'
 import open from 'open'
 import keypress from 'keypress'
-
+import { surge } from './lib/requires'
 import { _ } from './lib/fns'
 import log from './lib/log'
 import openInBrowser from './lib/openInBrowser'
@@ -17,27 +17,25 @@ import cache from './cache'
 
 const proc = process // cache for keypress
 
-import Surge from 'surge'
-const surge = Surge({ platform: 'flint.love', input: proc.stdin, output: proc.stdout })
-
 let stopped = false
 
 export function init() {
+  if (!proc.stdin.setRawMode) return
   start()
   banner()
 }
 
 function promptItem(message, color) {
-  return chalk.bold(message[0]) + message.slice(1)
+  return `${message.slice(0, 4)}${chalk.bold(message[4])}${message.slice(5)}`
 }
 
 let starts = (a, b) => a % b == 0
 
-function promptLayout(messages, { perLine = 2, prefix = '  ›', pad = 16 }) {
-  let item = str => promptItem(_.padEnd(`${prefix} ${str}`, pad))
+function promptLayout(messages, { perLine = 2, prefix = '  › ', pad = 12 }) {
+  let item = (str, color) => promptItem(_.padEnd(`${prefix}${str}`, pad))
 
   return messages.map((message, i) =>
-    starts(i, perLine) ? chalk.cyan(`\n${item(message)}`) : item(message)
+    starts(i, perLine) ? chalk.yellow(`\n${item(message)}`) : chalk.dim(item(message))
   ).join('')
 }
 
@@ -45,13 +43,17 @@ export function banner() {
   const newLine = "\n"
   const userEditor = (process.env.VISUAL || process.env.EDITOR)
 
-  console.log(`\n  http://${server.url()}`.bold.green)
+  console.log(`\n  http://${server.url()}`.green)
 
   const messages = [
     'Open', 'Verbose', 'Build',
     'Editor', 'Rebundle'
   ]
 
+  if (opts('build') && opts('watch'))
+    messages.push('Upload')
+
+  // console.log('  Shortcuts')
   console.log(promptLayout(messages, { perLine: 3 }))
   console.log()
 
@@ -61,10 +63,12 @@ export function banner() {
 function start() {
   let OPTS = opts()
 
-  if (!proc.stdin.isTTY || OPTS.isBuild)
+  if (!proc.stdin.isTTY || (OPTS.build && !OPTS.watch))
     return
 
   keypress(proc.stdin)
+
+  let building = false
 
   // listen for the "keypress" event
   proc.stdin.on('keypress', async function (ch, key) {
@@ -79,7 +83,6 @@ function start() {
           banner()
           break
         case 'b':
-          console.log('\n  Building...'.dim)
           await builder.build()
           break
         case 'o': // open browser
@@ -105,17 +108,30 @@ function start() {
           console.log(opts('debug') ? 'Set to log verbose'.yellow : 'Set to log quiet'.yellow, "\n")
           break
         case 'u': // upload
-          // await build({ once: true })
-          // console.log(`\n  Publishing to surge...`)
-          // stop()
-          // proc.stdout.isTTY = false
-          // surge.publish({
-          //   postPublish() {
-          //     console.log('🚀🚀🚀🚀')
-          //     resume()
-          //   }
-          // })({})
-          // proc.stdout.isTTY = true
+          if (building) return
+
+          if (opts('run')) {
+            building = true
+            console.log('\n  Building for production...')
+            await build({ once: true })
+            building = false
+          }
+
+          if (opts('build') && opts('watch')) {
+            let Surge = surge()
+            const surge = Surge({ platform: 'flint.love', input: proc.stdin, output: proc.stdout })
+
+            console.log(`\n  Publishing to surge...`)
+            stop()
+            proc.stdout.isTTY = false
+            surge.publish({
+              postPublish() {
+                console.log('🚀🚀🚀🚀')
+                resume()
+              }
+            })({})
+            proc.stdout.isTTY = true
+          }
           break
         case 'd':
           console.log("---------opts---------")
@@ -141,13 +157,13 @@ function start() {
 
 export function resume() {
   // listen for keys
-  if (proc.stdin.setRawMode) proc.stdin.setRawMode(true)
+  proc.stdin.setRawMode(true)
   proc.stdin.resume()
   stopped = false
 }
 
 export function stop() {
-  if (proc.stdin.setRawMode) proc.stdin.setRawMode(false)
+  proc.stdin.setRawMode(false)
   proc.stdin.pause()
   stopped = true
 }

@@ -1,13 +1,12 @@
 import cache from '../cache'
-import disk from '../disk'
 import opts from '../opts'
 import { readPackageJSON, readInstalled } from './lib/readInstalled'
 import normalize from './lib/normalize'
-import { bundleExternals } from './externals'
+import { externals } from './externals'
 import npm from './lib/npm'
 import writeInstalled from './lib/writeInstalled'
 import filterWithPath from './lib/filterWithPath'
-import { rm, p, _, log, handleError, readJSON, writeJSON } from '../lib/fns'
+import { rm, p, _, log, handleError } from '../lib/fns'
 
 const LOG = 'externals'
 
@@ -44,18 +43,8 @@ export async function uninstall(rebundle) {
         return dep
       }
       catch(e) {
-        try {
-          // manual uninstall
-          await rm(p(opts('modulesDir'), dep))
-          await disk.packageJSON.write((current, write) => {
-            delete current.dependencies[dep]
-            write(current)
-          })
-        }
-        catch(e) {
-          handleError(e)
-          return false
-        }
+        handleError(e)
+        return false
       }
     })
 
@@ -73,7 +62,7 @@ export async function uninstall(rebundle) {
 
     // if asked to rebundle or uninstalled, rebundle
     if (rebundle || uninstalled.length) {
-      await bundleExternals()
+      await externals()
     }
 
     return uninstalled

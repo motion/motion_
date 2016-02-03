@@ -3,25 +3,14 @@ import clone from 'clone'
 
 export default function hotCache({ Internal, options, name }) {
   return {
-    // on assign
-    set(name, val, result, useResult, updateOpts = { soft: true }) { // result = val after mutation, use that instead of val
-      if (process.env.production) {
-        this.update(updateOpts)
-        return val
-      }
+    // on assign, result = val after mutation, use that instead of val
+    set(name, val, result, useResult) {
+      if (process.env.production) return val
 
       const path = this.props.__flint.path
-
-      if (!Internal.getCache[path])
-        Internal.getCache[path] = {}
-
+      Internal.getCache[path] = Internal.getCache[path] || {}
       Internal.setCache(path, name, useResult ? result : val)
-      this.update(updateOpts)
       return val
-    },
-
-    setImmediate(name, val) {
-      this.set(name, val, null, null, { soft: true, immediate: true })
     },
 
     // on declaration

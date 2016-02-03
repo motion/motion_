@@ -6,25 +6,21 @@ import { log, handleError } from '../../lib/fns'
 const LOG = 'externals'
 
 export default async function progress(label, cmd, name, index, total) {
+  let spinner
+
   try {
-    const spinner = logProgress(label, name, index, total)
+    spinner = logProgress(label, name, index, total)
     await execPromise(cmd, opts('flintDir'))
     spinner && spinner.stop()
   }
   catch(e) {
     spinner && spinner.stop()
-
-    if (e.code == 1)
-      return handleError({ message: `${cmd} failed` })
-
-    handleError(e)
+    if (e.code == 1) throw new Error(`${cmd} failed`)
   }
 }
 
 function logProgress(tag, name, index, total) {
-  if (!opts('hasRunInitialBuild')) {
-    return
-  }
+  if (!opts('hasRunInitialBuild')) return
 
   log('bundler', 'logProgress', tag, name)
 
@@ -32,7 +28,7 @@ function logProgress(tag, name, index, total) {
     ? `  ${index+1} of ${total}: ${name}`
     : `  ${tag}: ${name}`.dim
 
-  if (opts('build'))
+  if (opts('build') && !opts('watch'))
     console.log(out)
   else {
     let spinner = new Spinner(out)

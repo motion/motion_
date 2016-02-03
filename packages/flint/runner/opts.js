@@ -1,49 +1,110 @@
 import path from 'path'
 import log from './lib/log'
-import { p, sanitize } from './lib/fns'
+import { p, sanitize, handleError, readJSON, readFile, exists } from './lib/fns'
 import disk from './disk'
 import util from 'util'
+import webpack from 'webpack'
+import getWebpackErrors from './bundler/lib/getWebpackErrors'
 
-let OPTS
+let OPTS = {}
 
-function set(key, val) {
-  log('opts.set'.bold.yellow, key, val)
-  OPTS[key] = val
-  return val
-}
-
-function get(key) {
-  // if (key != 'deps') log('opts'.bold.green, key, OPTS[key])
-  return key ? OPTS[key] : OPTS
-}
-
-function setAll(opts) {
-  // from cli
-  OPTS = {}
-
-  OPTS.name = opts.name || path.basename(process.cwd())
-  OPTS.saneName = sanitize(opts.name)
-
-  OPTS.version = opts.version
-  OPTS.debug = opts.debug
-  OPTS.port = opts.port
-  OPTS.host = opts.host
-  OPTS.watch = opts.watch
-  OPTS.pretty = opts.pretty
-  OPTS.reset = opts.reset
-  OPTS.cached = opts.cached
-  OPTS.nomin = opts.nomin
-
+export async function init(cli) {
+  // init
+  OPTS.appDir = path.normalize(process.cwd())
+  OPTS.name = cli.name || path.basename(process.cwd())
+  OPTS.saneName = sanitize(cli.name)
   OPTS.hasRunInitialBuild = false
-  OPTS.build = opts.isBuild
-  OPTS.buildWatch = opts.buildWatch
-
   OPTS.defaultPort = 4000
 
+  setupCliOpts(cli)
+  setupDirs()
+
+  // config
+  const config = await loadConfigs(cli)
+  setupConfig(cli, config)
+}
+
+function parseConfig() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      try {
+        const confLocation = p(OPTS.flintDir, 'config.js')
+        await exists(confLocation)
+      }
+      catch(e) {
+        resolve(false)
+      }
+
+      // for json loader
+      const runnerRoot = path.resolve(path.join(__dirname, '..'))
+      const runnerModules = path.join(runnerRoot, 'node_modules')
+
+      webpack({
+        context: OPTS.flintDir,
+        entry: './config.js',
+        output: {
+          filename: 'user-config.js',
+          path: './.flint/.internal',
+          libraryTarget: 'commonjs2'
+        },
+        module: {
+          loaders: [
+            { test: /\.json$/, loader: 'json' }
+          ]
+        },
+        resolveLoader: { root: runnerModules },
+      }, (err, stats) => {
+        const res = () => resolve(p(OPTS.internalDir, 'user-config.js'))
+        let error = getWebpackErrors('config', err, stats)
+        if (error) resolve(false)
+      })
+    }
+    catch(e) {
+      handleError(e)
+    }
+  })
+}
+
+function setupCliOpts(cli) {
+  OPTS.version = cli.version
+  OPTS.debug = cli.debug
+  OPTS.watch = cli.watch
+  OPTS.reset = cli.reset
+  OPTS.build = cli.build
+}
+
+async function loadConfigs() {
+  const file = await parseConfig()
+
+  if (file) {
+    // const userConf = require('./.flint/.internal/user-config')
+    const out = await readFile(file)
+    const conf = eval(out)
+    return modeMergedConfig(conf)
+  }
+
+  return await jsonConfig()
+}
+
+function modeMergedConfig(config) {
+  const modeSpecificConfig = config[OPTS.build ? 'build' : 'run']
+  const merged = Object.assign({}, config, modeSpecificConfig)
+  return merged
+}
+
+async function jsonConfig() {
+  try {
+    const config = await readJSON(OPTS.configFile)
+    return modeMergedConfig(config)
+  }
+  catch(e) {
+    handleError({ message: `Error parsing config file: ${OPTS.configFile}` })
+  }
+}
+
+function setupDirs() {
   // base dirs
-  OPTS.appDir = opts.appDir
-  OPTS.dir = OPTS.dir || opts.appDir
-  OPTS.flintDir = p(OPTS.dir || opts.appDir, '.flint')
+  OPTS.flintDir = p(OPTS.appDir, '.flint')
   OPTS.modulesDir = p(OPTS.flintDir, 'node_modules')
   OPTS.internalDir = p(OPTS.flintDir, '.internal')
   OPTS.depsDir = p(OPTS.internalDir, 'deps')
@@ -65,17 +126,37 @@ function setAll(opts) {
   OPTS.outDir = p(OPTS.internalDir, 'out')
   OPTS.styleDir = p(OPTS.internalDir, 'styles')
   OPTS.styleOutDir = p(OPTS.buildDir, '_', 'styles.css')
-
-  OPTS.config = {}
-
-  var folders = OPTS.dir.split('/')
-  OPTS.name = folders[folders.length - 1]
-  OPTS.url = OPTS.name + '.dev'
-
-  return OPTS
 }
 
-async function serialize() {
+function setupConfig(cli, config) {
+  // config
+  OPTS.config = Object.assign(
+    {
+      minify: true,
+      debug: false,
+      routing: true
+    },
+    config
+  )
+
+  // cli overrides config
+  if (cli.nomin) OPTS.config.minify = false
+  if (cli.pretty) OPTS.config.pretty = true
+  if (cli.port) OPTS.config.port = cli.port
+  if (cli.host) OPTS.config.host = cli.host
+}
+
+export function set(key, val) {
+  log.opts('opts.set'.bold.yellow, key, val)
+  OPTS[key] = val
+  return val
+}
+
+export function get(key) {
+  return key ? OPTS[key] : OPTS
+}
+
+export async function serialize() {
   await disk.state.write((state, write) => {
     state.opts = { ...OPTS }
     delete state.opts.state // prevent circular structure
@@ -83,18 +164,22 @@ async function serialize() {
   })
 }
 
-function debug() {
+export function debug() {
   console.log(util.inspect(OPTS, false, 10))
 }
 
 
+
+// this is bit funky, but lets us do:
+//   opts('dir') => path
+//   opts.set('dir', 'other')
+
 function opts(name) {
-  return get(key)
+  return get(name)
 }
 
-opts = get
 opts.set = set
-opts.setAll = setAll
+opts.init = init
 opts.serialize = serialize
 opts.debug = debug
 

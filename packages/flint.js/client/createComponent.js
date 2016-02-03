@@ -21,7 +21,6 @@ let views = {}
 let viewErrorDebouncers = {}
 
 export default function createComponent(Flint, Internal, name, view, options = {}) {
-  const el = createElement(name)
   let isChanged = options.changed
 
   // wrap decorators
@@ -136,7 +135,7 @@ export default function createComponent(Flint, Internal, name, view, options = {
       displayName: name,
       name,
       Flint,
-      el,
+      el: createElement,
 
       // set() get() dec()
       mixins: [hotCache({ Internal, options, name })],
@@ -175,7 +174,6 @@ export default function createComponent(Flint, Internal, name, view, options = {
         this.propDefaults = {}
         this.queuedUpdate = false
         this.firstRender = true
-        this.isUpdating = true
         this.styles = {}
         this.events = { mount: u, unmount: u, change: u, props: u }
         this.path = null
@@ -202,7 +200,6 @@ export default function createComponent(Flint, Internal, name, view, options = {
           }
           catch(e) {
             Internal.caughtRuntimeErrors++
-            console.log('reporting error from getInitialState')
             reportError(e)
             console.error(e.stack || e)
             this.recoveryRender = true
@@ -258,12 +255,16 @@ export default function createComponent(Flint, Internal, name, view, options = {
         if (name != 'Main') {
           this.runEvents('props', [this.props])
         }
+        else {
+          // moved to here to fix issues where updating during first mount fails
+          //    see: https://github.com/flintjs/flint/issues/305
+          Internal.firstRender = false
+        }
       },
 
       componentDidMount() {
         this.isRendering = false
         this.mounted = true
-        this.isUpdating = false
 
         this.runEvents('mount')
 
@@ -271,9 +272,6 @@ export default function createComponent(Flint, Internal, name, view, options = {
           this.queuedUpdate = false
           this.update()
         }
-
-        if (name === 'Main')
-          Internal.firstRender = false
 
         if (!process.env.production) {
           this.props.__flint.onMount(this)
@@ -299,7 +297,6 @@ export default function createComponent(Flint, Internal, name, view, options = {
       },
 
       componentWillUpdate() {
-        this.isUpdating = true
         this.runEvents('change')
       },
 
@@ -313,7 +310,6 @@ export default function createComponent(Flint, Internal, name, view, options = {
 
       componentDidUpdate() {
         this.isRendering = false
-        this.isUpdating = false
 
         if (this.queuedUpdate) {
           this.queuedUpdate = false
@@ -404,42 +400,34 @@ export default function createComponent(Flint, Internal, name, view, options = {
         this.update()
       },
 
-      // soft = view.set()
-      update({ soft, immediate } = {}) {
+      updateSoft() {
+        this.update(true)
+      },
+
+      // view.set()
+      update(soft) {
         // view.set respects paused
-        if (soft && this.isPaused)
-          return
+        if (soft && this.isPaused) return
 
-        let doUpdate = () => {
-          // if during a render, wait
-          if (this.isRendering || this.isUpdating || !this.mounted || Internal.firstRender) {
-            this.queuedUpdate = true
-          }
-          else {
-            // tools run into weird bug where if error in app on initial render, react gets
-            // mad that you are trying to re-render tools during app render TODO: strip in prod
-            // check for isRendering so it shows if fails to render
-            if (!process.env.production && _Flint.firstRender && _Flint.isRendering)
-              return setTimeout(this.update)
-
-            this.isUpdating = true
-            this.queuedUpdate = false
-
-            // rather than setState because we want to skip shouldUpdate calls
-            this.forceUpdate()
-          }
-        }
-
-        if (immediate) {
-          doUpdate()
-        }
-        else {
-          // setTimeout fixes issues with forceUpdate during previous transition in React
-          // batch changes at end of setTimeout
-          if (this.queuedUpdate) return
+        // if during a render, wait
+        if (!this.mounted || Internal.firstRender) {
           this.queuedUpdate = true
-          setTimeout(doUpdate)
+          return
         }
+
+        // during render, dont update
+        if (this.isRendering) return
+
+        // tools run into weird bug where if error in app on initial render, react gets
+        // mad that you are trying to re-render tools during app render TODO: strip in prod
+        // check for isRendering so it shows if fails to render
+        if (!process.env.production && _Flint.firstRender && _Flint.isRendering)
+          return setTimeout(this.update)
+
+        this.queuedUpdate = false
+
+        // rather than setState because we want to skip shouldUpdate calls
+        this.forceUpdate()
       },
 
       // childContextTypes: {
@@ -498,16 +486,15 @@ export default function createComponent(Flint, Internal, name, view, options = {
         let addWrapper = true
         const numRenders = this.renders && this.renders.length
 
+        // no root elements
         if (!numRenders) {
           tags = []
           props = { yield: true }
         }
-
+        // one root element
         else if (numRenders == 1) {
           tags = this.renders[0].call(this)
-
           const hasMultipleTags = Array.isArray(tags)
-
           addWrapper = hasMultipleTags || !tags.props
 
           if (!hasMultipleTags && tags.props && !tags.props.root) {
@@ -518,18 +505,12 @@ export default function createComponent(Flint, Internal, name, view, options = {
             }
           }
         }
-
+        // multiple root elements
         else if (numRenders > 1) {
           tags = this.renders.map(r => r.call(this))
         }
 
-        // top level tag returned false
-        if (!tags)
-          addWrapper = true
-
-        const wrappedTags = addWrapper ?
-          this.getWrapper(tags, props, numRenders) :
-          tags
+        const wrappedTags = addWrapper ? this.getWrapper(tags, props, numRenders) : tags
 
         const cleanName = name.replace('.', '-')
         const viewClassName = `View${cleanName}`

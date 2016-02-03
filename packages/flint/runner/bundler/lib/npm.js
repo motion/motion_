@@ -1,14 +1,50 @@
+import disk from '../../disk'
 import opts from '../../opts'
-import { p, readJSON } from '../../lib/fns'
+import { p, readJSON, handleError, rm } from '../../lib/fns'
 import execPromise from '../../lib/execPromise'
 import normalize from './normalize'
 import progress from './progress'
+import semver from 'semver'
 
 // npm install --save 'name'
 export async function save(name, index, total) {
   await progress('Installing', `npm install --save ${name}`, name, index, total)
   // npm 3 we need to install peerDependencies as well
   await installPeerDeps(name)
+}
+
+// npm uninstall --save 'name'
+export async function unsave(name, index, total) {
+  try {
+    await progress('Uninstalling', 'npm uninstall --save ' + name, name, index, total)
+  }
+  catch(e) {
+    // manual uninstall
+    await rm(p(opts('modulesDir'), name))
+    await disk.packageJSON.write((current, write) => {
+      delete current.dependencies[name]
+      write(current)
+    })
+  }
+}
+
+function splitVersions(range) {
+  const found = range.match(/[0-9\.]+/g)
+  return found.length ? found : range
+}
+
+function latestVersion(name, range) {
+  try {
+    return semver.maxSatisfying(splitVersions(range), range)
+  }
+  catch(e) {
+    const simpleFindVer = range.replace(/[^0-9\. ]+/g, '').split(' ')[0]
+
+    console.log(`  Error in semver of package ${name} ${e.message}`.yellow)
+    console.log("  Attempting ", simpleFindVer)
+
+    return simpleFindVer
+  }
 }
 
 // TODO: only do this if npm 3 `exec('npm -v').charAt(0) == 3`
@@ -23,17 +59,20 @@ async function installPeerDeps(name) {
 
     if (peersArr.length) {
       console.log(`  Installing ${name} peerDependencies`.bold)
-      const peersFull = peersArr.map(name => `${name}@${peers[name]}`)
+
+      const peersFull = peersArr.map(name => {
+        const version = latestVersion(name, peers[name])
+
+        if (!version)
+          throw new Error(`No valid version range for package ${name}@${peers[name]}`)
+
+        return `${name}@${version}`
+      })
       await* peersFull.map(full => execPromise(`npm install --save ${full}`, opts('flintDir')))
       console.log('  ✓'.green, peersArr.join(', '))
       return peersArr
     }
   }
-}
-
-// npm uninstall --save 'name'
-export async function unsave(name, index, total) {
-  await progress('Uninstalling', 'npm uninstall --save ' + name, name, index, total)
 }
 
 export default {

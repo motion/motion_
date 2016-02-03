@@ -5,16 +5,6 @@ var _ = require('lodash')
 
 var nodeModules = fs.readdirSync('node_modules')
 
-// let inline a few of the node modules for performance
-// TODO this can be done but has to be very careful (ex commander is bad, would be included in multiple)
-// once done we can move these to "devDependendencies"
-// var nodeModules = _.difference(nodeModules, [
-//   'deepmerge',
-//   'cors',
-//   'globby',
-//   'replace-ext',
-// ])
-
 var banners = [
   'require("source-map-support").install();'
 ].join("\n")
@@ -51,6 +41,11 @@ module.exports = {
   },
   externals: [
     function(context, request, callback) {
+      if (/user-config$/.test(request)) {
+        console.log(request)
+        return callback(null, request)
+      }
+
       var pathStart = request.split('/')[0];
       if (nodeModules.indexOf(pathStart) >= 0 && request != 'webpack/hot/signal.js') {
         return callback(null, "commonjs " + request);

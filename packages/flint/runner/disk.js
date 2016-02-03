@@ -5,7 +5,6 @@ import createWriter from './lib/createWriter'
 
 export async function init() {
   await createWriters()
-  await ensureConfigFile()
 }
 
 let writers = {
@@ -32,37 +31,26 @@ let writers = {
 
 async function createWriters() {
   writers.package = await createWriter(p(opts('flintDir'), 'package.json'), {
-    debug: 'writePackageJSON',
+    debug: 'packageJSON',
     json: true,
     defaultValue: {}
   })
 
   writers.stateWriter = await createWriter(opts('stateFile'), {
-    debug: 'writeState',
+    debug: 'state',
     json: true,
     defaultValue: {}
   })
 
   writers.pathsWriter = await createWriter(opts('deps').externalsPaths, {
-    debug: 'writeExternalsPaths',
+    debug: 'externalsPaths',
     json: true,
     defaultValue: []
   })
 
   writers.externalsWriter = await createWriter(opts('deps').externalsIn, {
-    debug: 'writeExternals'
+    debug: 'externals'
   })
-}
-
-async function ensureConfigFile() {
-  try {
-    let config = await readJSON(opts('configFile'))
-    opts.set('config', config)
-  }
-  catch(e) {
-    // write empty config on error
-    await writeJSON(opts('configFile'), {})
-  }
 }
 
 export async function writeServerState() {

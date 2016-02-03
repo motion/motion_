@@ -8,19 +8,16 @@ import npm from './lib/npm'
 import normalize from './lib/normalize'
 import remakeInstallDir from './lib/remakeInstallDir'
 import { uninstall } from './uninstall'
-import { bundleExternals } from './externals'
-import { bundleInternals } from './internals'
-
-const LOG = 'externals'
+import { externals } from './externals'
 
 // ensures all packages installed, uninstalled, written out to bundle
 export async function install(force) {
-  log('bundler', 'install')
+  log.externals('install')
   try {
     await remakeInstallDir(force)
     await uninstall()
     await installAll()
-    await bundleExternals()
+    await externals()
   }
   catch (e) {
     handleError(e)
@@ -40,46 +37,61 @@ function getToInstall(requires) {
 
 // used to quickly check if a file will trigger an install
 export async function willInstall(filePath) {
-  const required = cache.getExternals(filePath)
-  const fresh = await getNew(required)
-  return !!fresh.length
+  try {
+    const required = cache.getExternals(filePath)
+    const fresh = await getNew(required)
+    return !!fresh.length
+  }
+  catch(e) {
+    handleError(e)
+  }
 }
 
 // finds the new externals to install
 export async function getNew(requires, installed) {
+  if (!requires.length) return requires
+
   // get all installed
   installed = installed || await readInstalled()
 
   const names = normalize(requires)
+  if (!names.length) return names
+
   const fresh = _.difference(names, installed, installing)
-  log(LOG, 'getNew():', fresh, '(fresh) = ', names, '(names) -', installed, '(installed) -', installing, '(installing)')
+  log.externals('DOWN', '  ', names)
+  log.externals('DOWN', '- ', installed)
+  log.externals('DOWN', '- ', installing)
+  log.externals('DOWN', '= ', fresh)
   return fresh
 }
 
 export async function installAll(requires) {
-  log(LOG, 'installAll')
   try {
-    requires = requires || cache.getExternals()
+    if (!requires) requires = cache.getExternals()
 
     // nothing to install
-    if (!requires.length && !_isInstalling && opts('hasRunInitialBuild'))
+    if (!requires.length && !_isInstalling && opts('finishingFirstBuild'))
       opts.set('hasRunInitialInstall', true)
+
+    if (!requires.length)
+      return requires
 
     // determine whats new
     const installed = await readInstalled()
     const fresh = await getNew(requires, installed)
 
-    log(LOG, 'installAll requires', requires, 'installed', installed, 'fresh', fresh)
+    log.externals('installAll fresh', fresh)
 
     // nothing new
     if (!fresh.length) {
-      if (!_isInstalling) opts.set('hasRunInitialInstall', true)
+      if (!_isInstalling && opts('finishingFirstBuild'))
+        opts.set('hasRunInitialInstall', true)
 
       // new flint excluded require like babel-runtime, see rmFlintExternals
       // TODO this, getNew, normalize all need refactor -- in fact probably most of this file does :)
       if (requires.length) {
         await writeInstalled(installed)
-        await bundleExternals({ silent: true })
+        await externals({ silent: true })
       }
       return
     }
@@ -112,34 +124,34 @@ function runInstall(prevInstalled, toInstall) {
 
     try {
       await npm.save(dep)
-      log(LOG, 'install', 'succces, saved', dep)
+      log.externals('install', 'succces, saved', dep)
       successful.push(dep)
       onFinish(dep)
     }
     catch(e) {
-      console.error(`Error installing ${dep}`, e.message)
+      console.error(`\n  ${e.message}`.red)
       failed.push(dep)
-      log(LOG, 'package install failed', dep, e.message, e.stack)
+      log.externals('package install failed', dep, e.message, e.stack)
       onError(dep, e)
     }
     finally {
       let installed = installing.shift()
 
        // remove
-      log(LOG, 'install, finally:', installing)
+      log.externals('install, finally:', installing)
       next()
     }
   }
 
   function next() {
-    log(LOG, 'next #', installing.length)
+    log.externals('next #', installing.length)
     return installing.length ? installNext() : done()
   }
 
   async function done() {
     const installedFullPaths = _.flattenDeep(_.compact(_.uniq(installingFullNames)))
     let finalPaths = _.uniq([].concat(prevInstalled, installedFullPaths))
-    log(LOG, 'DONE, finalPaths', finalPaths)
+    log.externals('DONE, finalPaths', finalPaths)
 
     // remove failed
     if (failed && failed.length)
@@ -147,7 +159,7 @@ function runInstall(prevInstalled, toInstall) {
 
     logInstalled(successful)
     await writeInstalled(finalPaths, toInstall)
-    await bundleExternals()
+    await externals()
 
     // reset
     installingFullNames = []
@@ -183,12 +195,13 @@ function finishedInstalls() {
 
 function logInstalled(deps) {
   if (!deps.length) return
-  console.log(`\n  Installed ${deps.length} packages`.bold)
+  deps = _.uniq(deps) // TODO this is fixing a bug upwards
+  console.log(`\n  Installed ${deps.length} packages`.dim)
   deps.forEach(dep => console.log(`  ✓ ${dep}`.green))
 }
 
 export function isInstalling() {
-  log(LOG, 'isInstalling()', _isInstalling)
+  log.externals('isInstalling()', _isInstalling)
   return _isInstalling
 }
 
@@ -198,7 +211,7 @@ export function finishedInstalling() {
 }
 
 function isDone() {
-  return opts('build')
+  return (opts('build') && !opts('watch'))
     ? !_isInstalling && opts('hasRunInitialInstall')
     : !_isInstalling
 }

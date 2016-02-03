@@ -2,37 +2,44 @@ import md5 from 'md5-o-matic'
 import getType from '../lib/getType'
 import ellipsize from 'ellipsize'
 
+import { isString, isFunction,
+         isArray, isNumber, isObject } from 'lodash'
+
 const PATH_PREFIX = '.root.'
+const noop = () => {}
 const contains = (string, substring) => string.indexOf(substring) !== -1
 const isPrimitive = v => getType(v) !== 'Object' && getType(v) !== 'Array'
-
-let noop = () => {}
+const getLeafKey = (key, value) => isPrimitive(value) ?
+  (key + ':' + md5(String(key))) :
+  (key + '[' + getType(value) + ']')
+const fnParams = fn => fn.toString()
+  .replace(/((\/\/.*$)|(\/\*[\s\S]*?\*\/)|(\s))/mg,'')
+  .match(/^function\s*[^\(]*\(\s*([^\)]*)\)/m)[1]
+  .split(/,/)
 
 view Leaf {
-  prop isExpanded, data, prefix, query, label, id, editable
-  prop getOriginal = noop, onSet = noop, onClick = noop
-
   view.pause()
 
-  let rootPath, path, _data, type, key, original, expanded
+  prop root, isExpanded, data, prefix, query, label, id, editable
+  prop getOriginal = noop
+  prop onSet = noop
+  prop onClick = noop
+
+  // state
+  let rootPath, path, _data, key, original, expanded
+
   let dataKeys = []
   let _query = ''
 
-  const isInitiallyExpanded = () =>
-    view.props.root ||
-    !_query && isExpanded(path, data) ||
-    !contains(path, _query) && (typeof getOriginal === 'function')
+  // helpers
+  const isInitiallyExpanded = () => root || !_query && isExpanded(path, data) || !contains(path, _query)
 
-  const transformData = (data = {}) => {
-    data = Object.keys(_data).sort()
-  }
-
+  // lifecycle
   on.props(() => {
     rootPath = `${prefix}.${label}`
     key = label.toString()
     path = rootPath.substr(PATH_PREFIX.length)
-    // originally was stream of ||s, but 0 was turning into false
-    _data = data
+    _data = data // originally was stream of ||s, but 0 was turning into false
 
     // multiline strings
     if (typeof _data === 'string' && _data.indexOf('\n') > -1) {
@@ -44,7 +51,6 @@ view Leaf {
 
     if (_data === undefined) _data = data
     if (_data === undefined) _data = {}
-    type = getType(_data)
     _query = query || ''
 
     if (view.props.root)
@@ -58,10 +64,8 @@ view Leaf {
     view.update()
   })
 
-  function toggle(e) {
-    if (!view.props.root)
-      expanded = !expanded
-
+  const toggle = (e) => {
+    if (!root) expanded = !expanded
     view.update()
     onClick(_data)
     e.stopPropagation()
@@ -75,11 +79,6 @@ view Leaf {
     <Highlighter string={key} highlight={_query} />
   )
 
-  const fnParams = fn => fn.toString()
-    .replace(/((\/\/.*$)|(\/\*[\s\S]*?\*\/)|(\s))/mg,'')
-    .match(/^function\s*[^\(]*\(\s*([^\)]*)\)/m)[1]
-    .split(/,/)
-
   const getLabel = (type, val, sets, editable) => (
     <Label
       val={val}
@@ -88,31 +87,44 @@ view Leaf {
     />
   )
 
+  let is = {}, type;
+
+  on.change(() => {
+    is.function = isFunction(_data)
+    is.array = isArray(_data)
+    is.object = isObject(_data)
+    is.string = isString(_data)
+    is.number = isNumber(_data)
+    is.nested = is.function || is.object || is.array
+    is.literal = !is.nested
+    type = typeof _data
+  })
+
   <leaf class={rootPath}>
     <label if={!view.props.root} htmlFor={id} onClick={toggle}>
       <key>
         <name>{format(key)}</name>
-        {getLabel('key', key, key, false)}
       </key>
       <colon>:</colon>
-      <expand class="function" if={type == 'Function'}>
-        <i>fn ({fnParams(_data).join(', ')})</i>
-      </expand>
-
-      <expand if={type == 'Array'}>
-        <type>Array[{_data.length}]</type>
-      </expand>
-      <expand if={type == 'Object'}>
-        <type>{'{}   ' + dataKeys.length + ' keys'}</type>
-      </expand>
-      <value if={['Array', 'Object', 'Function'].indexOf(type) == -1} class={type.toLowerCase()}>
-        <str if={type.toLowerCase() == 'string'}>
-          {format(ellipsize(String(_data), 25))}
-        </str>
-        <else if={type.toLowerCase() != 'string'}>
-          {format(String(_data))}
-        </else>
-        {getLabel('val', _data, key, editable)}
+      <value>
+        <fn class="function" if={is.function}>
+          <i>fn ({fnParams(_data).join(', ')})</i>
+        </fn>
+        <array if={is.array}>
+          <type>Array[{_data.length}]</type>
+        </array>
+        <obj if={is.object}>
+          <type>{'{}   ' + dataKeys.length + ' keys'}</type>
+        </obj>
+        <nested if={is.nested} class={type.toLowerCase()}>
+          <str if={is.string}>
+            {format(ellipsize(String(_data), 25))}
+          </str>
+          <else if={!is.string && is.literal}>
+            {format(String(_data))}
+          </else>
+          {getLabel('val', _data, key, editable)}
+        </nested>
       </value>
     </label>
     <children>
@@ -164,7 +176,11 @@ view Leaf {
     fontWeight: 'bold'
   }]
 
-  $function = { marginLeft: 10, marginTop: 2, color: '#962eba' }
+  $function = {
+    marginLeft: 10,
+    marginTop: 2,
+    color: '#962eba'
+  }
 
   $colon = {
     opacity: 0.3,
@@ -177,8 +193,7 @@ view Leaf {
     margin: ['auto', 0]
   }
 
-  $expand = [row, {
-  }]
+  $expand = [row]
 
   $value = [row, {
     position: 'relative',

@@ -1,4 +1,5 @@
 import 'whatwg-fetch'
+import 'reapp-object-assign'
 
 import hashsum from 'hash-sum'
 import ee from 'event-emitter'
@@ -118,11 +119,11 @@ const Flint = {
       iff,
       noop: function(){},
 
-      // alpha
+      // beta
       _onViewInstance: (name, decorator) => !decorator
         ? Internal.instanceDecorator.all = name
         : Internal.instanceDecorator[name] = decorator,
-      _decorateView: (name, decorator) => !decorator
+      decorateView: (name, decorator) => !decorator
         ? Internal.viewDecorator.all = name
         : Internal.viewDecorator[name] = decorator,
 
@@ -216,6 +217,9 @@ const Flint = {
         if (!process.env.production) {
           const cached = Internal.viewCache[file] || Internal.viewsInFile[file]
           const views = Internal.viewsInFile[file]
+          // views.map(view => {
+          //   Flint.timer.time(view, Flint.timer.lastMsgInfo)
+          // })
 
           // remove Internal.viewsInFile that werent made
           const removedViews = arrayDiff(cached, views)
@@ -250,6 +254,8 @@ const Flint = {
             }).filter(x => !!x)
 
             emitter.emit('render:done')
+            // views.map(view => Flint.timer.done(view))
+            // Flint.timer.lastMsgInfo = null
           })
         }
       },
@@ -300,7 +306,7 @@ const Flint = {
 
           // if unchanged
           if (Internal.views[name].hash == hash) {
-            setView(name, comp({ hash }))
+            setView(name, comp({ hash, unchanged: true }))
             return
           }
 
