@@ -1,5 +1,6 @@
 import TransformPlugin from './transform'
 import opts from './opts'
+import deepmerge from 'deepmerge'
 
 export const transformPlugin = new TransformPlugin()
 
@@ -8,7 +9,7 @@ export function isProduction() {
 }
 
 export function getBabelConfig(config) {
-  return {
+  const babelConf = {
     breakConfig: true, // avoid reading .babelrc
     jsxPragma: 'view.el',
     stage: 1,
@@ -19,4 +20,11 @@ export function getBabelConfig(config) {
     plugins: [transformPlugin.get(config)],
     extra: { production: isProduction() }
   }
+
+  const userConf = opts('config').babel
+
+  if (userConf)
+    return deepmerge(babelConf, userConf)
+  else
+    return babelConf
 }
