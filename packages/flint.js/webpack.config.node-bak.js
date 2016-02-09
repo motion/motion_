@@ -5,5 +5,5 @@ module.exports = makeConf({
   entry: { flint: './src/flint' },
   env: 'production',
   target: 'node',
-  libraryTarget: 'umd'
+  libraryTarget: 'commonjs2'
 })

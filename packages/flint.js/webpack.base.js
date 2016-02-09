@@ -17,13 +17,13 @@ module.exports = function(opts) {
   ]
 
   // split react if not node
-  if (opts.target != 'node') {
+  if (opts.target != 'node' || opts.name == 'native') {
     splitReact(opts.name)
     // splitBabelRuntime(opts.name)
   }
 
   // if node, shim fetch
-  if (opts.target == 'node') {
+  if (opts.target == 'node' && opts.name !== 'native') {
     plugins.push(
       new webpack.ProvidePlugin({
         'fetch': 'imports?this=>global!exports?global.fetch!node-fetch'
@@ -49,7 +49,7 @@ module.exports = function(opts) {
   //   entry['babel-runtime'] = ['babel-runtime']
   // }
 
-  var target = opts.libraryTarget || 'commonjs'
+  var libraryTarget = opts.libraryTarget || 'commonjs2'
 
   return {
     target: opts.target || 'web',
@@ -62,6 +62,8 @@ module.exports = function(opts) {
       Buffer: false,
       setImmediate: false
     },
+
+    externals: opts.externals || {},
 
     module: {
       loaders: [
@@ -80,9 +82,9 @@ module.exports = function(opts) {
     },
 
     output: {
-      path: path.join(__dirname, 'dist'),
+      path: opts.path || path.join(__dirname, 'dist'),
       filename: opts.name ? '[name].'+opts.name+'.js' : '[name].js',
-      // libraryTarget: target || opts.libraryTarget
+      libraryTarget: libraryTarget,
     },
 
     plugins: plugins,

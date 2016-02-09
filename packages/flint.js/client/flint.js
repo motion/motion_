@@ -1,16 +1,17 @@
-import 'whatwg-fetch'
-import 'reapp-object-assign'
+// import 'whatwg-fetch'
+// import 'reapp-object-assign'
 
+/*
 import hashsum from 'hash-sum'
 import ee from 'event-emitter'
 import React from 'react'
 import ReactDOM from 'react-dom'
 import rafBatch from './lib/reactRaf'
-import { StyleRoot, keyframes } from 'flint-radium'
 import regeneratorRuntime from './vendor/regenerator'
+import { keyframes } from 'flint-radium'
 
 import './shim/root'
-import './shim/exports'
+// import './shim/exports'
 import './shim/on'
 import './lib/promiseErrorHandle'
 import internal from './internal'
@@ -29,17 +30,18 @@ import ErrorDefinedTwice from './views/ErrorDefinedTwice'
 import NotFound from './views/NotFound'
 import LastWorkingMainFactory from './views/LastWorkingMain'
 import MainErrorView from './views/Main'
+import runNative from './run.native'
+import runWeb from './run.web'
 
+const isNative = typeof React.Text !== 'undefined'
 const folderFromFile = (filePath) =>
   filePath.indexOf('/') < 0 ? '' : filePath.substring(0, filePath.lastIndexOf('/'))
 
-/*
-  Welcome to Flint!
+// Welcome to Flint!
 
-    This file deals mostly with setting up Flint,
-    loading views and files, rendering,
-    and exposing the public Flint functions
-*/
+//  This file deals mostly with setting up Flint,
+//  loading views and files, rendering,
+//  and exposing the public Flint functions
 
 const Flint = {
   // set up flint shims
@@ -72,7 +74,9 @@ const Flint = {
   },
 
   // run an app
-  run(name, _opts, afterRenderCb) {
+  run(nameOrRender, _opts, afterRenderCb) {
+    const name = isNative ? null : nameOrRender
+    const renderNative = isNative ? nameOrRender : null
     // default opts
     const opts = Object.assign({
       node: '_flintapp'
@@ -163,21 +167,19 @@ const Flint = {
             Main = MainErrorView
 
           // server render
-          if (!opts.node) {
-            Flint.renderedToString = React.renderToString(<Main />)
-            afterRenderCb && afterRenderCb(Flint.renderedToString)
-          }
-          // browser render
-          else {
+
+          // if (!opts.node) {
+            // Flint.renderedToString = React.renderToString(<Main />)
+            // afterRenderCb && afterRenderCb(Flint.renderedToString)
+          // }
+
+          if (isNative) {
+            renderNative(Main)
+          } else {
             if (window.__isDevingDevTools)
               opts.node = '_flintdevtools'
 
-            ReactDOM.render(
-              <StyleRoot className="__flintRoot">
-                <Main />
-              </StyleRoot>,
-              document.getElementById(opts.node)
-            )
+            runWeb(Main, opts.node)
           }
 
           Internal.lastWorkingViews.Main = Main
@@ -375,13 +377,17 @@ const Flint = {
     Object.freeze(Flint)
 
     // if given an app, run it
-    if (name && root.exports[name]) {
-      const app = root.exports[name]
-      app(Flint, opts)
-    }
+    //if (name && root.exports[name]) {
+      //const app = root.exports[name]
+      //app(Flint, opts)
+    //}
 
     return Flint
   }
 }
+*/
 
-root.exports.flint = Flint
+// root.exports.flint = Flint
+// global.Flint = Flint
+global.twelve = 13
+export default 5

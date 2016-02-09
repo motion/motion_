@@ -19,5 +19,8 @@
     "react": "^0.14.0",
     "react-dom": "^0.14.0",
     "reapp-object-assign": "1.0.0"
+  },
+  "dependencies": {
+    "no-op": "^1.0.3"
   }
 }

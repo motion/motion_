@@ -15,6 +15,9 @@ for p in "${packages[@]}"; do
   # webpack packages
   if [ -f "$f/webpack.config.js" ]; then
     cd $f
+    if [ -f "webpack.config.native.js" ]; then
+      node ../../node_modules/webpack/bin/webpack --config webpack.config.native.js $1 &
+    fi
     node ../../node_modules/webpack/bin/webpack --config webpack.config.js $1 &
     echo "running $f webpack for $f"
     cd ../..

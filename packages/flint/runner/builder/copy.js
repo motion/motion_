@@ -1,6 +1,7 @@
 import { log, p, copy, writeFile, readFile, readdir, handleError } from '../lib/fns'
 import opts from '../opts'
 import flintjs from 'flint-js'
+import exec from '../lib/exec'
 
 // todo gulpify alll the things
 
