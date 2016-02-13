@@ -2,6 +2,9 @@ const parentFolderMatch = s => s.match(/\.\.\//g)
 
 export default function requireFactory(root) {
   let app = ''
+  if (isNative) {
+    global.require = require
+  }
 
   function require(name, folder) {
     if (!name) return
@@ -79,6 +82,7 @@ export default function requireFactory(root) {
   }
 
   require.setApp = (appname) => {
+    console.log('setting app', appname)
     app = appname
   }
 

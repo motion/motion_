@@ -1,19 +1,19 @@
-// import 'whatwg-fetch'
-// import 'reapp-object-assign'
+import 'whatwg-fetch'
+import 'reapp-object-assign'
 
-/*
+import React from 'react'
 import hashsum from 'hash-sum'
 import ee from 'event-emitter'
-import React from 'react'
 import ReactDOM from 'react-dom'
-import rafBatch from './lib/reactRaf'
-import regeneratorRuntime from './vendor/regenerator'
-import { keyframes } from 'flint-radium'
+
+// import rafBatch from './lib/reactRaf'
+import { StyleRoot, keyframes } from 'flint-radium'
+// import regeneratorRuntime from './vendor/regenerator'
 
 import './shim/root'
-// import './shim/exports'
+import './shim/exports'
 import './shim/on'
-import './lib/promiseErrorHandle'
+// import './lib/promiseErrorHandle'
 import internal from './internal'
 import onError from './shim/flint'
 import createComponent from './createComponent'
@@ -28,20 +28,22 @@ import arrayDiff from './lib/arrayDiff'
 import createElement from './tag/createElement'
 import ErrorDefinedTwice from './views/ErrorDefinedTwice'
 import NotFound from './views/NotFound'
+
 import LastWorkingMainFactory from './views/LastWorkingMain'
 import MainErrorView from './views/Main'
-import runNative from './run.native'
-import runWeb from './run.web'
 
-const isNative = typeof React.Text !== 'undefined'
 const folderFromFile = (filePath) =>
   filePath.indexOf('/') < 0 ? '' : filePath.substring(0, filePath.lastIndexOf('/'))
 
 // Welcome to Flint!
 
-//  This file deals mostly with setting up Flint,
-//  loading views and files, rendering,
-//  and exposing the public Flint functions
+// This file deals mostly with setting up Flint,
+// loading views and files, rendering,
+// and exposing the public Flint functions
+
+if (typeof isNative === 'undefined') {
+  window.isNative = false
+}
 
 const Flint = {
   // set up flint shims
@@ -59,35 +61,36 @@ const Flint = {
       root.$ = null
     }
 
-    if (process.env.production) {
-      rafBatch.inject()
-    }
+    // if (process.env.production) {
+      // rafBatch.inject()
+    // }
 
     // shims
-    root.React = React
-    root.ReactDOM = ReactDOM
+    // root.React = React
+    // root.ReactDOM = ReactDOM
     root.global = root // for radium
     root.regeneratorRuntime = regeneratorRuntime
     root.on = on
-    root.fetch.json = (a, b, c) => fetch(a, b, c).then(res => res.json())
+    // root.fetch.json = (a, b, c) => fetch(a, b, c).then(res => res.json())
     root.require = requireFactory(root)
   },
 
   // run an app
-  run(nameOrRender, _opts, afterRenderCb) {
-    const name = isNative ? null : nameOrRender
-    const renderNative = isNative ? nameOrRender : null
+  run(name, _opts = {}, afterRenderCb) {
+    const renderNative = isNative ? _opts.render : null
+
+    //const { renderFn } = _opts
     // default opts
     const opts = Object.assign({
       node: '_flintapp'
     }, _opts)
 
-    const ID = ''+Math.random()
-
     // init require
     root.require.setApp(name)
 
     // init Internal
+
+    const ID = ''+Math.random()
     const Internal = internal.init(ID)
     root._Flint = Internal
 
@@ -103,18 +106,20 @@ const Flint = {
 
     // setup shims that use Internal
     onError(Internal, Tools)
-    const LastWorkingMain = LastWorkingMainFactory(Internal)
 
-    const emitter = ee({})
 
     //
     // begin the flintception
     //
 
+    const LastWorkingMain = LastWorkingMainFactory(Internal, React)
+
+    const emitter = ee({})
+
     const Flint = {
       start() {
-        router.init(ID, { onChange: Flint.render })
-        Flint.render()
+        // router.init(ID, { onChange: Flint.render })
+        return Flint.render()
       },
 
       // private API
@@ -132,7 +137,7 @@ const Flint = {
         : Internal.viewDecorator[name] = decorator,
 
       // external API
-      keyframes,
+      //keyframes,
       router,
       preloaders: [], // async functions needed before loading app
 
@@ -167,22 +172,28 @@ const Flint = {
             Main = MainErrorView
 
           // server render
-
-          // if (!opts.node) {
-            // Flint.renderedToString = React.renderToString(<Main />)
+          // if (!native && !_opts.node) {
+            // Flint.renderedToString = ReactDOM.renderToString(<Main />)
             // afterRenderCb && afterRenderCb(Flint.renderedToString)
           // }
+          // browser render
+          //else {
+          if (window.__isDevingDevTools)
+            opts.node = '_flintdevtools'
 
           if (isNative) {
-            renderNative(Main)
+            renderNative(<Main />)
           } else {
-            if (window.__isDevingDevTools)
-              opts.node = '_flintdevtools'
-
-            runWeb(Main, opts.node)
+            ReactDOM.render(
+              <StyleRoot className="__flintRoot">
+                <Main />
+              </StyleRoot>,
+              document.getElementById(opts.node)
+            )
           }
+          //}
 
-          Internal.lastWorkingViews.Main = Main
+          // Internal.lastWorkingViews.Main = Main
           emitter.emit('render:done')
           Internal.isRendering = 0
         }
@@ -273,7 +284,7 @@ const Flint = {
       view(name, body) {
         const comp = opts => createComponent(Flint, Internal, name, body, opts)
 
-        if (process.env.production)
+        if (!isNative && process.env.production)
           return setView(name, comp())
 
         const hash = hashsum(body)
@@ -288,7 +299,8 @@ const Flint = {
           viewsInFile.push(name)
 
         // if new
-        if (!Internal.views[name]) {
+
+        if (isNative || !Internal.views[name]) {
           setView(name, comp({ hash, changed: true }))
           Internal.changedViews.push(name)
           return
@@ -377,17 +389,16 @@ const Flint = {
     Object.freeze(Flint)
 
     // if given an app, run it
-    //if (name && root.exports[name]) {
-      //const app = root.exports[name]
-      //app(Flint, opts)
-    //}
+    if (name && root.exports[name]) {
+      const app = root.exports[name]
+      app(Flint, _opts)
+    }
 
     return Flint
   }
 }
-*/
 
-// root.exports.flint = Flint
-// global.Flint = Flint
-global.twelve = 13
-export default 5
+root.exports.flint = Flint
+
+// root.CreateFlint = Flint
+export default Flint

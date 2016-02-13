@@ -17,7 +17,7 @@ module.exports = function(opts) {
   ]
 
   // split react if not node
-  if (opts.target != 'node' || opts.name == 'native') {
+  if (opts.target !== 'node') {
     splitReact(opts.name)
     // splitBabelRuntime(opts.name)
   }
@@ -49,7 +49,7 @@ module.exports = function(opts) {
   //   entry['babel-runtime'] = ['babel-runtime']
   // }
 
-  var libraryTarget = opts.libraryTarget || 'commonjs2'
+  var libraryTarget = opts.libraryTarget || 'commonjs'
 
   return {
     target: opts.target || 'web',
@@ -81,11 +81,12 @@ module.exports = function(opts) {
       ]
     },
 
-    output: {
+    output: Object.assign({}, {
       path: opts.path || path.join(__dirname, 'dist'),
       filename: opts.name ? '[name].'+opts.name+'.js' : '[name].js',
-      libraryTarget: libraryTarget,
-    },
+      // libraryTarget: libraryTarget,
+      // library: opts.library,
+    }, opts.output || {}),
 
     plugins: plugins,
 

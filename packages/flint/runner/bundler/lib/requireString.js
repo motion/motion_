@@ -15,7 +15,7 @@ export default function requireString(names, { prefix = '', removeExt = false } 
     return `  packages["${name}"] = require("${prefix}${name}");\n`
   }).join('')}
 
-  window.require.setApp("${opts('saneName')}")
+  root.require.setApp("${opts('saneName')}")
   module.exports = packages
   `
 }

@@ -36,5 +36,11 @@ export default function createElement(identifier : Identifier, _props, ...args) 
 
   const tag = props.tagName || (el.whitelisted ? DIV : el.component || el.name)
 
+  if (props.style && props.style.web) {
+    Object.assign(props.style, props.style.web)
+    delete props.style.web
+  }
+  if (props.style && props.style.native) delete props.style.native
+
   return React.createElement(tag, props, ...args)
 }

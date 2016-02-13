@@ -50,7 +50,6 @@ export default function createComponent(Flint, Internal, name, view, options = {
   // proxy components handle hot reloads
   function createProxyComponent() {
     return React.createClass({
-
       childContextTypes: {
         path: React.PropTypes.string,
         displayName: React.PropTypes.string
@@ -165,6 +164,7 @@ export default function createComponent(Flint, Internal, name, view, options = {
 
       getInitialState() {
         const fprops = this.props.__flint
+        this.inlineStyles()
 
         Internal.getInitialStates[fprops ? fprops.path : 'Main'] = () => this.getInitialState()
 
@@ -301,7 +301,7 @@ export default function createComponent(Flint, Internal, name, view, options = {
       },
 
       setID() {
-        if (Internal.isDevTools) return
+        if (Internal.isDevTools || isNative) return
 
         // set flintID for state inspect
         const node = ReactDOM.findDOMNode(this)
@@ -578,16 +578,26 @@ export default function createComponent(Flint, Internal, name, view, options = {
           const lastRender = self.getLastGoodRender()
 
           try {
-            let inner = <span>Error in view {name}</span>
+            let inner = null
+            if (isNative) {
+              const { Text } = React
+              inner = <Text>Error in view</Text>
+            } else {
+              inner = <span>Error in view {name}</span>
+            }
+            console.log('is native is', isNative, 'inner', inner)
 
             if (Internal.isDevTools)
               return inner
 
+            if (isNative) { return inner }
+            
             if (lastRender) {
               let __html = ReactDOMServer.renderToString(lastRender)
               __html = __html.replace(/\s*data\-react[a-z-]*\=\"[^"]*\"/g, '')
               inner = <span dangerouslySetInnerHTML={{ __html }} />
             }
+
 
             // highlight in red and return last working render
             return (
