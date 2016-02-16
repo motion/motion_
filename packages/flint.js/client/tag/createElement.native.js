@@ -65,10 +65,16 @@ const getInstance = {
   },
   view(name, props, children = []) {
     props.style = omit(props.style, textStyles)
-    if (children.length === 1) {
-      return <TouchableWithoutFeedback {...props}>{children}</TouchableWithoutFeedback>
+    const onTouchable = ['onPress', 'onClick', 'key']
+    const touches = pick(props, onTouchable)
+    const noTouches = omit(props, onTouchable)
+
+    if (Object.keys(touches).length > 0) {
+      return (<TouchableWithoutFeedback {...touches}>
+        <View {...noTouches}>{children}</View>
+      </TouchableWithoutFeedback>)
     } else {
-      return <View {...props}>{children}</View>
+      return (<View {...props}>{children}</View>)
     }
   },
   input(name, props, children) {
@@ -80,7 +86,7 @@ function getNativeEl(tag, props, children) {
   if (!isString(tag)) return React.createElement(tag, props, children)
 
   const special = ['img', 'input']
-  const name = includes(special, tag) ? tag : 'view'
+  const name = (tag=='img' || tag=='input') ? tag : 'view'
 
   const textStyle = pick(props.style || {}, textStyles)
 

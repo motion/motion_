@@ -82,7 +82,6 @@ export default function requireFactory(root) {
   }
 
   require.setApp = (appname) => {
-    console.log('setting app', appname)
     app = appname
   }
 

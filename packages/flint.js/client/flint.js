@@ -43,7 +43,6 @@ const folderFromFile = (filePath) =>
 // loading views and files, rendering,
 // and exposing the public Flint functions
 
-console.log('global is', global)
 if (typeof global.isNative === 'undefined') {
   global.isNative = false
 }
@@ -163,7 +162,6 @@ const Flint = {
           run()
 
         function run() {
-          console.log('im running')
           Internal.isRendering++
           if (Internal.isRendering > 3) return
 
@@ -184,7 +182,6 @@ const Flint = {
           if (window.__isDevingDevTools)
             opts.node = '_flintdevtools'
 
-          console.log('about to call run ', Main, opts, runApp)
           runApp(<Main />, opts)
           //}
 
