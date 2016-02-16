@@ -1,4 +1,5 @@
 import React from 'react'
+console.log('r is', React, global.React)
 
 export default React.createClass({
   render() {

@@ -10,6 +10,7 @@ import keys from './keys'
 import watchDeletes from './lib/watchDeletes'
 import { logError, handleError, path, log } from './lib/fns'
 import Editor from './editor'
+import native from './native'
 
 // welcome to flint!
 
@@ -70,6 +71,9 @@ export async function run(opts) {
     await startup(opts)
     if (opts.watch) gulp.assets()
     await server.run()
+    if (opts.native === true) {
+      native.prepare()
+    }
     activateEditor(bridge)
     bridge.activate()
     await gulpScripts()

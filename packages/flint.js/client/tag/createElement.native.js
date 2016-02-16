@@ -63,7 +63,7 @@ const getInstance = {
       <Text onPress={() => { console.log('press text')}} {...textProps}>{children}</Text>
     </TouchableWithoutFeedback>
   },
-  view(name, props, children) {
+  view(name, props, children = []) {
     props.style = omit(props.style, textStyles)
     if (children.length === 1) {
       return <TouchableWithoutFeedback {...props}>{children}</TouchableWithoutFeedback>
@@ -89,7 +89,7 @@ function getNativeEl(tag, props, children) {
   children = children
     .map(el => isSimple(el) ? <Text key={keyID++} style={textStyle}>{toS(el)}</Text> : el)
 
-  if (children.length === 1) children = children[0]
+  if (children && children.length === 1) children = children[0]
 
   return getInstance[name](name, props, children)
 }

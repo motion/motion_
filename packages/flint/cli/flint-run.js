@@ -14,6 +14,7 @@ Program
   .option('-h, --host [host]', 'specify hostname')
   .option('--pretty', 'pretty print files')
   .option('--reset', 'resets cache, internals, bundles')
+  .option('--native', 'runs with native runner')
   .option('--cached', 'run from cache for speedup (may break)')
   .parse(process.argv)
 
@@ -21,6 +22,7 @@ run({
   name,
   version,
   debug: Program.debug,
+  native: Program.native,
   port: Program.port,
   host: Program.host,
   pretty: Program.pretty,

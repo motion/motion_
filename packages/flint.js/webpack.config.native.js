@@ -1,9 +1,9 @@
 var makeConf = require('./webpack.base');
-
 module.exports = makeConf({
   externals: {
-    react: 'React',
+    react: 'require("react-native")',
     'react-dom': 'null',
+    'flint-radium': 'null',
     'reapp-object-assign': 'null',
     'whatwg-fetch': 'null',
   },
@@ -11,8 +11,4 @@ module.exports = makeConf({
   env: 'development',
   minify: false,
   target: 'node',
-  output: {
-    library: "Flint",
-    libraryTarget: 'var',
-  }
 })

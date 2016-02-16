@@ -2,7 +2,7 @@ const parentFolderMatch = s => s.match(/\.\.\//g)
 
 export default function requireFactory(root) {
   let app = ''
-  if (isNative) {
+  if (global.isNative) {
     global.require = require
   }
 

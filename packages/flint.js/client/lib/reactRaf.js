@@ -1,3 +1,4 @@
+/*
 import ReactUpdates from 'react/lib/ReactUpdates'
 import raf from 'raf'
 
@@ -17,3 +18,5 @@ const inject = () => {
 }
 
 export default { inject };
+
+*/

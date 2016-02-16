@@ -6,7 +6,7 @@ import hashsum from 'hash-sum'
 import ee from 'event-emitter'
 import ReactDOM from 'react-dom'
 
-// import rafBatch from './lib/reactRaf'
+// import rafzBatch from './libz/reactRaf'
 import { StyleRoot, keyframes } from 'flint-radium'
 // import regeneratorRuntime from './vendor/regenerator'
 
@@ -28,6 +28,7 @@ import arrayDiff from './lib/arrayDiff'
 import createElement from './tag/createElement'
 import ErrorDefinedTwice from './views/ErrorDefinedTwice'
 import NotFound from './views/NotFound'
+import runApp from './run'
 
 import LastWorkingMainFactory from './views/LastWorkingMain'
 import MainErrorView from './views/Main'
@@ -35,15 +36,18 @@ import MainErrorView from './views/Main'
 const folderFromFile = (filePath) =>
   filePath.indexOf('/') < 0 ? '' : filePath.substring(0, filePath.lastIndexOf('/'))
 
+
 // Welcome to Flint!
 
 // This file deals mostly with setting up Flint,
 // loading views and files, rendering,
 // and exposing the public Flint functions
 
-if (typeof isNative === 'undefined') {
-  window.isNative = false
+console.log('global is', global)
+if (typeof global.isNative === 'undefined') {
+  global.isNative = false
 }
+
 
 const Flint = {
   // set up flint shims
@@ -77,8 +81,6 @@ const Flint = {
 
   // run an app
   run(name, _opts = {}, afterRenderCb) {
-    const renderNative = isNative ? _opts.render : null
-
     //const { renderFn } = _opts
     // default opts
     const opts = Object.assign({
@@ -161,6 +163,7 @@ const Flint = {
           run()
 
         function run() {
+          console.log('im running')
           Internal.isRendering++
           if (Internal.isRendering > 3) return
 
@@ -181,16 +184,8 @@ const Flint = {
           if (window.__isDevingDevTools)
             opts.node = '_flintdevtools'
 
-          if (isNative) {
-            renderNative(<Main />)
-          } else {
-            ReactDOM.render(
-              <StyleRoot className="__flintRoot">
-                <Main />
-              </StyleRoot>,
-              document.getElementById(opts.node)
-            )
-          }
+          console.log('about to call run ', Main, opts, runApp)
+          runApp(<Main />, opts)
           //}
 
           // Internal.lastWorkingViews.Main = Main
@@ -284,7 +279,7 @@ const Flint = {
       view(name, body) {
         const comp = opts => createComponent(Flint, Internal, name, body, opts)
 
-        if (!isNative && process.env.production)
+        if (!global.isNative && process.env.production)
           return setView(name, comp())
 
         const hash = hashsum(body)
@@ -300,7 +295,7 @@ const Flint = {
 
         // if new
 
-        if (isNative || !Internal.views[name]) {
+        if (global.isNative || !Internal.views[name]) {
           setView(name, comp({ hash, changed: true }))
           Internal.changedViews.push(name)
           return
@@ -401,4 +396,5 @@ const Flint = {
 root.exports.flint = Flint
 
 // root.CreateFlint = Flint
+global.Flint = Flint
 export default Flint

@@ -1,4 +1,3 @@
-import ReactDOMServer from 'react-dom/server'
 import ReactDOM from 'react-dom'
 import React from 'react'
 import raf from 'raf'
@@ -301,7 +300,7 @@ export default function createComponent(Flint, Internal, name, view, options = {
       },
 
       setID() {
-        if (Internal.isDevTools || isNative) return
+        if (Internal.isDevTools || global.isNative) return
 
         // set flintID for state inspect
         const node = ReactDOM.findDOMNode(this)
@@ -479,8 +478,8 @@ export default function createComponent(Flint, Internal, name, view, options = {
       },
 
       getRender() {
-        if (this.recoveryRender)
-          return this.getLastGoodRender()
+        // if (this.recoveryRender)
+          // return this.getLastGoodRender()
 
         let tags, props
         let addWrapper = true
@@ -579,7 +578,7 @@ export default function createComponent(Flint, Internal, name, view, options = {
 
           try {
             let inner = null
-            if (isNative) {
+            if (global.isNative) {
               const { Text } = React
               inner = <Text>Error in view</Text>
             } else {
@@ -590,10 +589,11 @@ export default function createComponent(Flint, Internal, name, view, options = {
             if (Internal.isDevTools)
               return inner
 
-            if (isNative) { return inner }
-            
-            if (lastRender) {
-              let __html = ReactDOMServer.renderToString(lastRender)
+            if (global.isNative) { return inner }
+
+            if (lastRender && global.isNative) {
+              const server = ReactDOM.server
+              let __html = server.renderToString(lastRender)
               __html = __html.replace(/\s*data\-react[a-z-]*\=\"[^"]*\"/g, '')
               inner = <span dangerouslySetInnerHTML={{ __html }} />
             }
@@ -626,6 +626,6 @@ export default function createComponent(Flint, Internal, name, view, options = {
       }
     })
 
-    return Radium(component)
+    return global.isNative ? component : Radium(component)
   }
 }

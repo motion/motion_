@@ -7,12 +7,7 @@ import React, {
   View,
 } from 'react'
 
-export default () => {
-  const App = class extends Component {
-    render() {
-      return <Text>hello native</Text>
-    }
-  }
-
-  AppRegistry.registerComponent('project', () => App)
+export default (Main, opts) => {
+  console.log('running', Main, opts)
+  opts.render(Main)
 }
